@@ -221,12 +221,23 @@
         .playback-section {
             background: var(--bg-light);
             border-radius: 8px;
-            padding: 1.5rem;
+            padding: clamp(0.75rem, 2vh, 1.5rem);
+        }
+
+        .playback-section h6 {
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            margin-bottom: clamp(0.5rem, 1vh, 1rem) !important;
         }
 
         audio {
             width: 100%;
-            margin-bottom: 1rem;
+            margin-bottom: clamp(0.5rem, 1vh, 1rem);
+            height: clamp(40px, 6vh, 54px);
+        }
+
+        .playback-section .btn {
+            padding: clamp(0.5rem, 1.5vh, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+            font-size: clamp(0.9rem, 2vw, 1rem);
         }
 
         .mb-4 {

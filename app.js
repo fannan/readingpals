@@ -448,10 +448,12 @@ class FeedbackRecorder {
     resetForNewRecording() {
         this.playbackSection.style.display = 'none';
         this.recordingControls.style.display = 'none';
+        this.recordSection.style.display = 'block'; // Show record section again
         this.recordBtn.disabled = false;
         this.recordBtn.classList.remove('recording');
         this.recordStatus.textContent = 'Click the microphone button';
         this.statusBar.style.width = '0%';
+        this.statusBar.style.background = 'var(--accent-color)'; // Reset to orange
         this.audioChunks = [];
     }
 
@@ -481,9 +483,8 @@ class FeedbackRecorder {
     updateUIForPlayback() {
         this.recordBtn.classList.remove('recording');
         this.recordingControls.style.display = 'none';
+        this.recordSection.style.display = 'none'; // Hide entire record section
         this.playbackSection.style.display = 'block';
-        this.recordStatus.textContent = 'Recording complete! Review and submit.';
-        this.statusBar.style.width = '100%';
     }
 
     startTimer() {
