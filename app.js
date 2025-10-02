@@ -521,6 +521,9 @@ class FeedbackRecorder {
         this.recordingControls.style.display = 'block';
         this.playbackSection.style.display = 'none';
         this.recordStatus.textContent = 'Recording...';
+
+        // Disable stop button until minimum time is reached
+        this.stopBtn.disabled = true;
     }
 
     updateUIForPlayback() {
@@ -541,14 +544,16 @@ class FeedbackRecorder {
                 const progress = Math.min((elapsed / this.minimumSeconds) * 100, 100);
                 this.statusBar.style.width = `${progress}%`;
 
-                // Change color when minimum is reached
+                // Change color and enable stop button when minimum is reached
                 if (elapsed >= this.minimumSeconds) {
                     this.statusBar.style.background = '#28A745'; // Green
                     this.recordStatus.textContent = `Recording... ${minutes}:${seconds.toString().padStart(2, '0')} ✓`;
+                    this.stopBtn.disabled = false; // Enable stop button
                 } else {
                     this.statusBar.style.background = 'var(--accent-color)'; // Orange
                     const remaining = this.minimumSeconds - elapsed;
                     this.recordStatus.textContent = `Recording... ${minutes}:${seconds.toString().padStart(2, '0')} (${remaining}s remaining)`;
+                    this.stopBtn.disabled = true; // Keep stop button disabled
                 }
             }
         }, 1000);
