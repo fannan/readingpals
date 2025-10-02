@@ -51,6 +51,8 @@ class FeedbackRecorder {
         this.loadingSection = document.getElementById('loadingSection');
         this.audioPlayback = document.getElementById('audioPlayback');
         this.feedbackForm = document.getElementById('feedbackForm');
+        this.staffDisplay = document.getElementById('staffDisplay');
+        this.staffNames = document.getElementById('staffNames');
     }
 
     bindEvents() {
@@ -152,12 +154,8 @@ class FeedbackRecorder {
             const options = { year: 'numeric', month: 'long', day: 'numeric' };
             const formattedDate = date.toLocaleDateString('en-US', options);
 
-            // Include day and staff in display (staff is array of objects with name property)
-            const staffText = dateObj.staff && dateObj.staff.length > 0
-                ? ` - ${dateObj.staff.map(s => s.name).join(', ')}`
-                : '';
-
-            return `${dateObj.day}, ${formattedDate}${staffText}`;
+            // Don't include staff in the date display anymore
+            return `${dateObj.day}, ${formattedDate}`;
         } catch (error) {
             return dateObj.date;
         }
@@ -234,8 +232,19 @@ class FeedbackRecorder {
         this.selectedDate = this.dateSelect.value;
         console.log('Date selected:', this.selectedDate);
 
-        // Note: We don't need to repopulate volunteers on date change
-        // since volunteers can work on any date
+        // Update staff display
+        if (this.selectedDate) {
+            const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
+            if (selectedDateObj && selectedDateObj.staff && selectedDateObj.staff.length > 0) {
+                const staffNamesList = selectedDateObj.staff.map(s => s.name).join(', ');
+                this.staffNames.textContent = staffNamesList;
+                this.staffDisplay.style.display = 'block';
+            } else {
+                this.staffDisplay.style.display = 'none';
+            }
+        } else {
+            this.staffDisplay.style.display = 'none';
+        }
     }
 
     checkURLParameters() {
