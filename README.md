@@ -1,4 +1,4 @@
-# Reading Pals Feedback Tracker
+# Reading Pals Session Feedback Tracker
 
 A simple, serverless web application for collecting voice feedback from volunteers in the Reading Pals program.
 
