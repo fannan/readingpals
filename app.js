@@ -9,9 +9,11 @@ class FeedbackRecorder {
         this.storage = null;
         this.availableDates = [];
         this.volunteers = [];
+        this.allStudents = []; // Store all students separately
         this.selectedDate = null;
         this.selectedVolunteer = null;
         this.minimumSeconds = 30; // Default minimum recording time
+        this.showAllStudents = false; // Flag to show all students or only volunteer's students
 
         this.initializeElements();
         this.bindEvents();
@@ -105,10 +107,27 @@ class FeedbackRecorder {
                 this.volunteers = [];
             }
 
+            // Extract all students from all volunteers into a single list
+            const allStudentsMap = new Map();
+            this.volunteers.forEach(volunteer => {
+                volunteer.students.forEach(student => {
+                    if (!allStudentsMap.has(student.id)) {
+                        allStudentsMap.set(student.id, student);
+                    }
+                });
+            });
+            this.allStudents = Array.from(allStudentsMap.values());
+
             // Get minimum recording seconds from config
             if (data.seconds && typeof data.seconds === 'number') {
                 this.minimumSeconds = data.seconds;
                 console.log('Minimum recording time:', this.minimumSeconds, 'seconds');
+            }
+
+            // Get showAllStudents flag from config (defaults to false)
+            if (typeof data.show_all_students === 'boolean') {
+                this.showAllStudents = data.show_all_students;
+                console.log('Show all students:', this.showAllStudents);
             }
 
             console.log('Available dates loaded:', this.availableDates);
@@ -337,9 +356,10 @@ class FeedbackRecorder {
             this.selectedVolunteer = this.volunteers.find(v => v.id === volunteerId);
             console.log('Volunteer selected:', this.selectedVolunteer);
 
-            // Populate student dropdown with this volunteer's students
+            // Populate student dropdown - either all students or just this volunteer's students
             if (this.selectedVolunteer) {
-                this.populateStudentDropdown(this.selectedVolunteer.students);
+                const studentsToShow = this.showAllStudents ? this.allStudents : this.selectedVolunteer.students;
+                this.populateStudentDropdown(studentsToShow);
 
                 // Show student dropdown
                 if (this.studentSelect) {
@@ -361,6 +381,9 @@ class FeedbackRecorder {
     populateStudentDropdown(students) {
         if (!this.studentSelect) return;
 
+        // Store students list for later retrieval
+        this.currentStudentsList = students;
+
         // Clear existing options
         this.studentSelect.innerHTML = '<option value="">Select a student...</option>';
 
@@ -369,8 +392,11 @@ class FeedbackRecorder {
             return;
         }
 
+        // Sort students alphabetically by name
+        const sortedStudents = [...students].sort((a, b) => a.name.localeCompare(b.name));
+
         // Add all students as options, storing index to retrieve full student object later
-        students.forEach((student, index) => {
+        sortedStudents.forEach((student, index) => {
             const option = document.createElement('option');
             option.value = index; // Store index to retrieve student object
             option.textContent = student.name;
@@ -615,8 +641,8 @@ class FeedbackRecorder {
             throw new Error('Please select a student');
         }
 
-        // Get the selected student object
-        const selectedStudent = this.selectedVolunteer.students[studentIndex];
+        // Get the selected student object from the current students list
+        const selectedStudent = this.currentStudentsList[studentIndex];
         if (!selectedStudent) {
             throw new Error('Invalid student selection');
         }
