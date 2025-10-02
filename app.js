@@ -82,12 +82,13 @@ class FeedbackRecorder {
             // Response is wrapped in an array, get the first element
             const data = Array.isArray(result) ? result[0] : result;
 
-            // Parse the new format: { data: [ { name: "2025-10-06", staff: [...], day_name: "Monday" }, ... ], volunteers: [...] }
+            // Parse the new format: { data: [ { name: "2025-10-06", staff: [...], volunteers: [...], day_name: "Monday" }, ... ], volunteers: [...] }
             if (data.data && Array.isArray(data.data)) {
                 this.availableDates = data.data.map(item => ({
                     date: item.name,
                     day: item.day_name,
-                    staff: item.staff || []  // Store staff array with id, name, url
+                    staff: item.staff || [],  // VIPs/Super Volunteers
+                    volunteers: item.volunteers || []  // Scheduled volunteers for this date
                 }));
             } else {
                 this.availableDates = [];
@@ -218,12 +219,12 @@ class FeedbackRecorder {
 
         if (this.selectedDate) {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
-            if (selectedDateObj && selectedDateObj.staff && selectedDateObj.staff.length > 0) {
-                // Get staff IDs for this date
-                const staffIds = selectedDateObj.staff.map(s => s.id);
+            if (selectedDateObj && selectedDateObj.volunteers && selectedDateObj.volunteers.length > 0) {
+                // Get volunteer IDs scheduled for this date
+                const scheduledVolunteerIds = selectedDateObj.volunteers.map(v => v.id);
 
-                // Filter volunteers to only those scheduled (in staff array)
-                volunteersToShow = this.volunteers.filter(v => staffIds.includes(v.id));
+                // Filter volunteers to only those scheduled for this date
+                volunteersToShow = this.volunteers.filter(v => scheduledVolunteerIds.includes(v.id));
                 console.log('Filtering to', volunteersToShow.length, 'volunteers scheduled for', this.selectedDate);
             }
         }
