@@ -213,13 +213,32 @@ class FeedbackRecorder {
             return;
         }
 
-        // Show all volunteers (they can submit feedback for any scheduled date)
+        // Filter volunteers based on selected date
+        let volunteersToShow = this.volunteers;
+
+        if (this.selectedDate) {
+            const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
+            if (selectedDateObj && selectedDateObj.staff && selectedDateObj.staff.length > 0) {
+                // Get staff IDs for this date
+                const staffIds = selectedDateObj.staff.map(s => s.id);
+
+                // Filter volunteers to only those scheduled (in staff array)
+                volunteersToShow = this.volunteers.filter(v => staffIds.includes(v.id));
+                console.log('Filtering to', volunteersToShow.length, 'volunteers scheduled for', this.selectedDate);
+            }
+        }
+
+        if (volunteersToShow.length === 0) {
+            this.volunteerSelect.innerHTML = '<option value="">No volunteers scheduled for this date</option>';
+            return;
+        }
+
         // Sort volunteers alphabetically by name
-        const sortedVolunteers = [...this.volunteers].sort((a, b) =>
+        const sortedVolunteers = [...volunteersToShow].sort((a, b) =>
             a.name.localeCompare(b.name)
         );
 
-        // Add all volunteers as options
+        // Add filtered volunteers as options
         sortedVolunteers.forEach((volunteer) => {
             const option = document.createElement('option');
             option.value = volunteer.id;
@@ -233,6 +252,18 @@ class FeedbackRecorder {
     onDateSelected() {
         this.selectedDate = this.dateSelect.value;
         console.log('Date selected:', this.selectedDate);
+
+        // Repopulate volunteer dropdown based on selected date
+        this.populateVolunteerDropdown();
+
+        // Reset volunteer and student selections since we're changing the date
+        this.volunteerSelect.value = '';
+        this.selectedVolunteer = null;
+        if (this.studentSelect) {
+            this.studentSelect.parentElement.style.display = 'none';
+            this.studentSelect.value = '';
+        }
+        this.updateRecordButtonState();
 
         // Update staff display
         if (this.selectedDate) {
