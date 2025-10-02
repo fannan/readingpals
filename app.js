@@ -315,7 +315,7 @@ class FeedbackRecorder {
         this.recordBtn.disabled = !isReady;
 
         if (isReady) {
-            this.recordStatus.textContent = 'Ready to record - Click the microphone button';
+            this.recordStatus.textContent = 'Click the microphone button';
             this.recordBtn.innerHTML = '<i class="bi bi-mic-fill"></i>';
         } else if (volunteerSelected && !studentSelected) {
             this.recordStatus.textContent = 'Select a student to continue';
@@ -414,7 +414,7 @@ class FeedbackRecorder {
         this.recordingControls.style.display = 'none';
         this.recordBtn.disabled = false;
         this.recordBtn.classList.remove('recording');
-        this.recordStatus.textContent = 'Ready to record - Click the microphone button';
+        this.recordStatus.textContent = 'Click the microphone button';
         this.statusBar.style.width = '0%';
         this.audioChunks = [];
     }
