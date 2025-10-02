@@ -45,8 +45,10 @@ class FeedbackRecorder {
         this.submitBtn = document.getElementById('submitBtn');
         this.recordStatus = document.getElementById('recordStatus');
         this.statusBar = document.getElementById('statusBar');
+        this.recordSection = document.getElementById('recordSection');
         this.recordingControls = document.getElementById('recordingControls');
         this.playbackSection = document.getElementById('playbackSection');
+        this.loadingSection = document.getElementById('loadingSection');
         this.audioPlayback = document.getElementById('audioPlayback');
         this.feedbackForm = document.getElementById('feedbackForm');
     }
@@ -340,7 +342,13 @@ class FeedbackRecorder {
         const studentSelected = this.studentSelect && this.studentSelect.value !== '';
         const isReady = volunteerSelected && studentSelected;
 
-        this.recordBtn.disabled = !isReady;
+        // Show/hide record section based on student selection
+        if (studentSelected) {
+            this.recordSection.style.display = 'block';
+            this.recordBtn.disabled = !isReady;
+        } else {
+            this.recordSection.style.display = 'none';
+        }
 
         if (isReady) {
             this.recordStatus.textContent = 'Click the microphone button';
@@ -522,8 +530,11 @@ class FeedbackRecorder {
             return;
         }
 
-        this.submitBtn.disabled = true;
-        this.submitBtn.innerHTML = '<i class="bi bi-spinner-border spinner-border-sm"></i> Uploading...';
+        // Hide all sections and show loading
+        this.recordSection.style.display = 'none';
+        this.recordingControls.style.display = 'none';
+        this.playbackSection.style.display = 'none';
+        this.loadingSection.style.display = 'block';
 
         try {
             await this.uploadToSupabase();
@@ -531,9 +542,9 @@ class FeedbackRecorder {
         } catch (error) {
             console.error('Upload error:', error);
             this.showError('Failed to upload feedback. Please try again.');
-        } finally {
-            this.submitBtn.disabled = false;
-            this.submitBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> Submit Feedback';
+            // Show playback section again on error
+            this.loadingSection.style.display = 'none';
+            this.playbackSection.style.display = 'block';
         }
     }
 
@@ -599,36 +610,58 @@ class FeedbackRecorder {
 
     showSuccess() {
         const volunteerName = this.volunteerSelect.options[this.volunteerSelect.selectedIndex].text;
-        this.showAlert(`Thank you ${volunteerName}! Your feedback has been submitted successfully.`, 'success');
 
-        // Reset form after successful submission
-        setTimeout(() => {
-            this.resetForNewRecording();
-            this.volunteerSelect.value = '';
-            this.onVolunteerSelected();
-        }, 3000);
+        // Hide loading, show success alert
+        this.loadingSection.style.display = 'none';
+
+        // Show success alert with OK button
+        this.showAlert(`Thank you ${volunteerName}! Your feedback has been submitted successfully.`, 'success', true);
     }
 
-    showAlert(message, type) {
+    showAlert(message, type, withButton = false) {
         // Remove existing alerts
         const existingAlerts = document.querySelectorAll('.alert-notification');
         existingAlerts.forEach(alert => alert.remove());
 
         const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-notification d-flex align-items-center`;
-        alertDiv.innerHTML = `
-            <i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-3"></i>
-            <div>${message}</div>
-        `;
+        alertDiv.className = `alert alert-${type} alert-notification`;
 
+        if (withButton) {
+            alertDiv.innerHTML = `
+                <div class="d-flex align-items-center mb-3">
+                    <i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-3" style="font-size: 2rem;"></i>
+                    <div style="flex: 1;">${message}</div>
+                </div>
+                <button class="btn btn-primary w-100" id="alertOkBtn">OK</button>
+            `;
+        } else {
+            alertDiv.innerHTML = `
+                <i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-3"></i>
+                <div>${message}</div>
+            `;
+        }
+
+        alertDiv.style.cssText = 'padding: 2rem; margin-bottom: 1.5rem;';
         this.feedbackForm.insertBefore(alertDiv, this.feedbackForm.firstChild);
 
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
+        if (withButton) {
+            // Add OK button click handler
+            const okBtn = document.getElementById('alertOkBtn');
+            okBtn.addEventListener('click', () => {
                 alertDiv.remove();
-            }
-        }, 5000);
+                // Reset to volunteer selected state (clear student selection)
+                this.resetForNewRecording();
+                this.studentSelect.value = '';
+                this.updateRecordButtonState();
+            });
+        } else {
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
     }
 }
 
