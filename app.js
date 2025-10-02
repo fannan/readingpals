@@ -236,21 +236,47 @@ class FeedbackRecorder {
 
     checkURLParameters() {
         const urlParams = new URLSearchParams(window.location.search);
+
+        // Pre-select date if provided
+        const dateParam = urlParams.get('date');
+        if (dateParam && this.dateSelect) {
+            const dateOption = Array.from(this.dateSelect.options).find(opt =>
+                opt.value === dateParam
+            );
+            if (dateOption) {
+                this.dateSelect.value = dateParam;
+                this.selectedDate = dateParam;
+                this.onDateSelected();
+            }
+        }
+
+        // Pre-select volunteer if provided
         const volunteerParam = urlParams.get('volunteer');
-
         if (volunteerParam) {
-            // Convert URL parameter to select option value format
-            const formattedValue = volunteerParam.toLowerCase().replace(/\s+/g, '-');
-
-            // Find matching option
-            const option = Array.from(this.volunteerSelect.options).find(opt =>
-                opt.value === formattedValue ||
-                opt.textContent.toLowerCase().replace(/\s+/g, '-') === formattedValue
+            // Try to find by ID first, then by name
+            const volunteer = this.volunteers.find(v =>
+                v.id === volunteerParam ||
+                v.name.toLowerCase().replace(/\s+/g, '-') === volunteerParam.toLowerCase()
             );
 
-            if (option) {
-                this.volunteerSelect.value = option.value;
+            if (volunteer && this.volunteerSelect) {
+                this.volunteerSelect.value = volunteer.id;
                 this.onVolunteerSelected();
+
+                // Pre-select student if provided
+                const studentParam = urlParams.get('student');
+                if (studentParam && this.selectedVolunteer) {
+                    setTimeout(() => {
+                        const studentIndex = this.selectedVolunteer.students.findIndex(s =>
+                            s.id === studentParam ||
+                            s.name.toLowerCase().replace(/\s+/g, '-') === studentParam.toLowerCase()
+                        );
+                        if (studentIndex !== -1 && this.studentSelect) {
+                            this.studentSelect.value = studentIndex;
+                            this.updateRecordButtonState();
+                        }
+                    }, 100); // Small delay to ensure dropdown is populated
+                }
             }
         }
     }
