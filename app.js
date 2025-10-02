@@ -15,8 +15,7 @@ class FeedbackRecorder {
 
         this.initializeElements();
         this.bindEvents();
-        this.loadAvailableDates();
-        this.checkURLParameters();
+        this.loadAvailableDates(); // Will call checkURLParameters() after data loads
         this.initializeStorage();
     }
 
@@ -112,6 +111,9 @@ class FeedbackRecorder {
 
             this.populateDateDropdown();
             this.populateVolunteerDropdown();
+
+            // Check URL parameters AFTER data is loaded
+            this.checkURLParameters();
 
         } catch (error) {
             console.error('Failed to load dates:', error);
