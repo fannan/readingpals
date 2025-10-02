@@ -609,59 +609,38 @@ class FeedbackRecorder {
     }
 
     showSuccess() {
-        const volunteerName = this.volunteerSelect.options[this.volunteerSelect.selectedIndex].text;
-
-        // Hide loading, show success alert
+        // Hide loading
         this.loadingSection.style.display = 'none';
 
-        // Show success alert with OK button
-        this.showAlert(`Thank you ${volunteerName}! Your feedback has been submitted successfully.`, 'success', true);
+        // Show native JavaScript alert
+        alert('Thanks! Your feedback has been submitted successfully.');
+
+        // Reset to volunteer selected state (clear student selection)
+        this.resetForNewRecording();
+        this.studentSelect.value = '';
+        this.updateRecordButtonState();
     }
 
-    showAlert(message, type, withButton = false) {
+    showAlert(message, type) {
         // Remove existing alerts
         const existingAlerts = document.querySelectorAll('.alert-notification');
         existingAlerts.forEach(alert => alert.remove());
 
         const alertDiv = document.createElement('div');
-        alertDiv.className = `alert alert-${type} alert-notification`;
+        alertDiv.className = `alert alert-${type} alert-notification d-flex align-items-center`;
+        alertDiv.innerHTML = `
+            <i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-3"></i>
+            <div>${message}</div>
+        `;
 
-        if (withButton) {
-            alertDiv.innerHTML = `
-                <div class="d-flex align-items-center mb-3">
-                    <i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-3" style="font-size: 2rem;"></i>
-                    <div style="flex: 1;">${message}</div>
-                </div>
-                <button class="btn btn-primary w-100" id="alertOkBtn">OK</button>
-            `;
-        } else {
-            alertDiv.innerHTML = `
-                <i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-3"></i>
-                <div>${message}</div>
-            `;
-        }
-
-        alertDiv.style.cssText = 'padding: 2rem; margin-bottom: 1.5rem;';
         this.feedbackForm.insertBefore(alertDiv, this.feedbackForm.firstChild);
 
-        if (withButton) {
-            // Add OK button click handler
-            const okBtn = document.getElementById('alertOkBtn');
-            okBtn.addEventListener('click', () => {
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
                 alertDiv.remove();
-                // Reset to volunteer selected state (clear student selection)
-                this.resetForNewRecording();
-                this.studentSelect.value = '';
-                this.updateRecordButtonState();
-            });
-        } else {
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                if (alertDiv.parentNode) {
-                    alertDiv.remove();
-                }
-            }, 5000);
-        }
+            }
+        }, 5000);
     }
 }
 
