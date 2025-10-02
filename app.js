@@ -199,6 +199,8 @@ class FeedbackRecorder {
             this.dateSelect.value = closestDateObj.date;
             this.selectedDate = closestDateObj.date;
             console.log('Pre-selected date:', closestDateObj.date);
+            // Trigger date selection to show staff
+            this.onDateSelected();
         }
     }
 
