@@ -1,0 +1,610 @@
+class FeedbackRecorder {
+    constructor() {
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.isRecording = false;
+        this.isPaused = false;
+        this.recordingStartTime = null;
+        this.recordingTimer = null;
+        this.storage = null;
+        this.availableDates = [];
+        this.volunteers = [];
+        this.selectedDate = null;
+        this.selectedVolunteer = null;
+        this.minimumSeconds = 30; // Default minimum recording time
+
+        this.initializeElements();
+        this.bindEvents();
+        this.loadAvailableDates();
+        this.checkURLParameters();
+        this.initializeStorage();
+    }
+
+    initializeStorage() {
+        try {
+            if (window.SimpleSupabaseUpload) {
+                this.storage = new SimpleSupabaseUpload();
+                console.log('Simple Supabase Upload initialized');
+            } else {
+                console.warn('SimpleSupabaseUpload not available, retrying...');
+                setTimeout(() => this.initializeStorage(), 500);
+            }
+        } catch (error) {
+            console.warn('Storage initialization failed:', error);
+            setTimeout(() => this.initializeStorage(), 1000);
+        }
+    }
+
+    initializeElements() {
+        this.dateSelect = document.getElementById('dateSelect');
+        this.volunteerSelect = document.getElementById('volunteerSelect');
+        this.studentSelect = document.getElementById('studentSelect');
+        this.recordBtn = document.getElementById('recordBtn');
+        this.pauseBtn = document.getElementById('pauseBtn');
+        this.stopBtn = document.getElementById('stopBtn');
+        this.reRecordBtn = document.getElementById('reRecordBtn');
+        this.submitBtn = document.getElementById('submitBtn');
+        this.recordStatus = document.getElementById('recordStatus');
+        this.statusBar = document.getElementById('statusBar');
+        this.recordingControls = document.getElementById('recordingControls');
+        this.playbackSection = document.getElementById('playbackSection');
+        this.audioPlayback = document.getElementById('audioPlayback');
+        this.feedbackForm = document.getElementById('feedbackForm');
+    }
+
+    bindEvents() {
+        this.dateSelect.addEventListener('change', () => this.onDateSelected());
+        this.volunteerSelect.addEventListener('change', () => this.onVolunteerSelected());
+        if (this.studentSelect) {
+            this.studentSelect.addEventListener('change', () => this.updateRecordButtonState());
+        }
+        this.recordBtn.addEventListener('click', () => this.startRecording());
+        this.pauseBtn.addEventListener('click', () => this.togglePauseRecording());
+        this.stopBtn.addEventListener('click', () => this.stopRecording());
+        this.reRecordBtn.addEventListener('click', () => this.resetForNewRecording());
+        this.feedbackForm.addEventListener('submit', (e) => this.handleSubmit(e));
+    }
+
+    async loadAvailableDates() {
+        try {
+            console.log('Loading available dates from API...');
+            const response = await fetch('https://tasks.sklabs.app/webhook/94d3fc3e-1570-488e-b14c-4435e7e513fa');
+
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            // Response is wrapped in an array, get the first element
+            const data = Array.isArray(result) ? result[0] : result;
+
+            // Parse the new format: { data: [ { name: "2025-10-06", staff: [...], day_name: "Monday" }, ... ], volunteers: [...] }
+            if (data.data && Array.isArray(data.data)) {
+                this.availableDates = data.data.map(item => ({
+                    date: item.name,
+                    day: item.day_name,
+                    staff: item.staff || []  // Store staff array with id, name, url
+                }));
+            } else {
+                this.availableDates = [];
+            }
+
+            // Extract volunteers list with their students
+            if (data.volunteers && Array.isArray(data.volunteers)) {
+                this.volunteers = data.volunteers.map(volunteer => ({
+                    id: volunteer.id,
+                    name: volunteer.name,
+                    students: volunteer.students || []
+                }));
+            } else {
+                this.volunteers = [];
+            }
+
+            // Get minimum recording seconds from config
+            if (data.seconds && typeof data.seconds === 'number') {
+                this.minimumSeconds = data.seconds;
+                console.log('Minimum recording time:', this.minimumSeconds, 'seconds');
+            }
+
+            console.log('Available dates loaded:', this.availableDates);
+            console.log('Volunteers loaded:', this.volunteers);
+
+            this.populateDateDropdown();
+            this.populateVolunteerDropdown();
+
+        } catch (error) {
+            console.error('Failed to load dates:', error);
+            this.dateSelect.innerHTML = '<option value="">Error loading dates</option>';
+        }
+    }
+
+    populateDateDropdown() {
+        // Clear existing options
+        this.dateSelect.innerHTML = '<option value="">Select a date...</option>';
+
+        if (this.availableDates.length === 0) {
+            this.dateSelect.innerHTML = '<option value="">No dates available</option>';
+            return;
+        }
+
+        // Add all dates as options
+        this.availableDates.forEach(dateObj => {
+            const option = document.createElement('option');
+            option.value = dateObj.date;
+            option.textContent = this.formatDateForDisplay(dateObj);
+            this.dateSelect.appendChild(option);
+        });
+
+        // Pre-select the closest future date
+        this.selectClosestFutureDate();
+    }
+
+    formatDateForDisplay(dateObj) {
+        try {
+            // Parse date as local time to avoid timezone issues
+            const [year, month, day] = dateObj.date.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            const formattedDate = date.toLocaleDateString('en-US', options);
+
+            // Include day and staff in display (staff is array of objects with name property)
+            const staffText = dateObj.staff && dateObj.staff.length > 0
+                ? ` - ${dateObj.staff.map(s => s.name).join(', ')}`
+                : '';
+
+            return `${dateObj.day}, ${formattedDate}${staffText}`;
+        } catch (error) {
+            return dateObj.date;
+        }
+    }
+
+    selectClosestFutureDate() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Find the closest date that is today or in the future
+        let closestDateObj = null;
+        let minDiff = Infinity;
+
+        this.availableDates.forEach(dateObj => {
+            // Parse date as local time to avoid timezone issues
+            const [year, month, day] = dateObj.date.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            date.setHours(0, 0, 0, 0);
+
+            const diff = date - today;
+
+            // Only consider today or future dates
+            if (diff >= 0 && diff < minDiff) {
+                minDiff = diff;
+                closestDateObj = dateObj;
+            }
+        });
+
+        // If no future date found, select the most recent past date
+        if (!closestDateObj && this.availableDates.length > 0) {
+            closestDateObj = this.availableDates.reduce((latest, current) => {
+                const [y1, m1, d1] = latest.date.split('-').map(Number);
+                const [y2, m2, d2] = current.date.split('-').map(Number);
+                const date1 = new Date(y1, m1 - 1, d1);
+                const date2 = new Date(y2, m2 - 1, d2);
+                return date2 > date1 ? current : latest;
+            });
+        }
+
+        if (closestDateObj) {
+            this.dateSelect.value = closestDateObj.date;
+            this.selectedDate = closestDateObj.date;
+            console.log('Pre-selected date:', closestDateObj.date);
+        }
+    }
+
+    populateVolunteerDropdown() {
+        // Clear existing options
+        this.volunteerSelect.innerHTML = '<option value="">Choose your name...</option>';
+
+        if (this.volunteers.length === 0) {
+            this.volunteerSelect.innerHTML = '<option value="">No volunteers available</option>';
+            return;
+        }
+
+        // Show all volunteers (they can submit feedback for any scheduled date)
+        // Sort volunteers alphabetically by name
+        const sortedVolunteers = [...this.volunteers].sort((a, b) =>
+            a.name.localeCompare(b.name)
+        );
+
+        // Add all volunteers as options
+        sortedVolunteers.forEach((volunteer) => {
+            const option = document.createElement('option');
+            option.value = volunteer.id;
+            option.textContent = volunteer.name;
+            this.volunteerSelect.appendChild(option);
+        });
+
+        console.log('Volunteer dropdown populated with', sortedVolunteers.length, 'volunteers');
+    }
+
+    onDateSelected() {
+        this.selectedDate = this.dateSelect.value;
+        console.log('Date selected:', this.selectedDate);
+
+        // Note: We don't need to repopulate volunteers on date change
+        // since volunteers can work on any date
+    }
+
+    checkURLParameters() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const volunteerParam = urlParams.get('volunteer');
+
+        if (volunteerParam) {
+            // Convert URL parameter to select option value format
+            const formattedValue = volunteerParam.toLowerCase().replace(/\s+/g, '-');
+
+            // Find matching option
+            const option = Array.from(this.volunteerSelect.options).find(opt =>
+                opt.value === formattedValue ||
+                opt.textContent.toLowerCase().replace(/\s+/g, '-') === formattedValue
+            );
+
+            if (option) {
+                this.volunteerSelect.value = option.value;
+                this.onVolunteerSelected();
+            }
+        }
+    }
+
+    onVolunteerSelected() {
+        const volunteerId = this.volunteerSelect.value;
+        const isSelected = volunteerId !== '';
+
+        if (isSelected) {
+            // Find volunteer by ID instead of index
+            this.selectedVolunteer = this.volunteers.find(v => v.id === volunteerId);
+            console.log('Volunteer selected:', this.selectedVolunteer);
+
+            // Populate student dropdown with this volunteer's students
+            if (this.selectedVolunteer) {
+                this.populateStudentDropdown(this.selectedVolunteer.students);
+
+                // Show student dropdown
+                if (this.studentSelect) {
+                    this.studentSelect.parentElement.style.display = 'block';
+                }
+            }
+        } else {
+            this.selectedVolunteer = null;
+            // Hide student dropdown
+            if (this.studentSelect) {
+                this.studentSelect.parentElement.style.display = 'none';
+            }
+        }
+
+        // Enable record button only if both volunteer and student are selected
+        this.updateRecordButtonState();
+    }
+
+    populateStudentDropdown(students) {
+        if (!this.studentSelect) return;
+
+        // Clear existing options
+        this.studentSelect.innerHTML = '<option value="">Select a student...</option>';
+
+        if (!students || students.length === 0) {
+            this.studentSelect.innerHTML = '<option value="">No students assigned</option>';
+            return;
+        }
+
+        // Add all students as options, storing index to retrieve full student object later
+        students.forEach((student, index) => {
+            const option = document.createElement('option');
+            option.value = index; // Store index to retrieve student object
+            option.textContent = student.name;
+            this.studentSelect.appendChild(option);
+        });
+
+        console.log('Student dropdown populated with', students.length, 'students');
+    }
+
+    updateRecordButtonState() {
+        const volunteerSelected = this.volunteerSelect.value !== '';
+        const studentSelected = this.studentSelect && this.studentSelect.value !== '';
+        const isReady = volunteerSelected && studentSelected;
+
+        this.recordBtn.disabled = !isReady;
+
+        if (isReady) {
+            this.recordStatus.textContent = 'Ready to record - Click the microphone button';
+            this.recordBtn.innerHTML = '<i class="bi bi-mic-fill"></i>';
+        } else if (volunteerSelected && !studentSelected) {
+            this.recordStatus.textContent = 'Select a student to continue';
+            this.recordBtn.disabled = true;
+        } else {
+            this.recordStatus.textContent = 'Select your name to start recording';
+            this.recordBtn.disabled = true;
+        }
+    }
+
+    async startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 44100
+                }
+            });
+
+            this.audioChunks = [];
+            this.mediaRecorder = new MediaRecorder(stream, {
+                mimeType: this.getSupportedMimeType()
+            });
+
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            };
+
+            this.mediaRecorder.onstop = () => {
+                this.handleRecordingComplete();
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            this.mediaRecorder.start(1000); // Collect data every second
+            this.isRecording = true;
+            this.recordingStartTime = Date.now();
+
+            this.updateUIForRecording();
+            this.startTimer();
+
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            this.showError('Unable to access microphone. Please check permissions.');
+        }
+    }
+
+    getSupportedMimeType() {
+        const types = [
+            'audio/webm;codecs=opus',
+            'audio/webm',
+            'audio/mp4',
+            'audio/mpeg'
+        ];
+
+        for (const type of types) {
+            if (MediaRecorder.isTypeSupported(type)) {
+                return type;
+            }
+        }
+        return 'audio/webm'; // fallback
+    }
+
+    togglePauseRecording() {
+        if (!this.mediaRecorder) return;
+
+        if (this.isPaused) {
+            this.mediaRecorder.resume();
+            this.isPaused = false;
+            this.pauseBtn.innerHTML = '<i class="bi bi-pause-fill"></i> Pause';
+            this.recordStatus.textContent = 'Recording resumed...';
+            this.startTimer();
+        } else {
+            this.mediaRecorder.pause();
+            this.isPaused = true;
+            this.pauseBtn.innerHTML = '<i class="bi bi-play-fill"></i> Resume';
+            this.recordStatus.textContent = 'Recording paused';
+            this.stopTimer();
+        }
+    }
+
+    stopRecording() {
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+            this.isPaused = false;
+            this.stopTimer();
+        }
+    }
+
+    resetForNewRecording() {
+        this.playbackSection.style.display = 'none';
+        this.recordingControls.style.display = 'none';
+        this.recordBtn.disabled = false;
+        this.recordBtn.classList.remove('recording');
+        this.recordStatus.textContent = 'Ready to record - Click the microphone button';
+        this.statusBar.style.width = '0%';
+        this.audioChunks = [];
+    }
+
+    handleRecordingComplete() {
+        const audioBlob = new Blob(this.audioChunks, {
+            type: this.getSupportedMimeType()
+        });
+
+        const audioUrl = URL.createObjectURL(audioBlob);
+        this.audioPlayback.src = audioUrl;
+
+        // Store the blob for upload
+        this.recordedAudioBlob = audioBlob;
+
+        this.updateUIForPlayback();
+    }
+
+    updateUIForRecording() {
+        this.recordBtn.classList.add('recording');
+        this.recordBtn.innerHTML = '<i class="bi bi-record-fill"></i>';
+        this.recordBtn.disabled = true;
+        this.recordingControls.style.display = 'block';
+        this.playbackSection.style.display = 'none';
+        this.recordStatus.textContent = 'Recording...';
+    }
+
+    updateUIForPlayback() {
+        this.recordBtn.classList.remove('recording');
+        this.recordingControls.style.display = 'none';
+        this.playbackSection.style.display = 'block';
+        this.recordStatus.textContent = 'Recording complete! Review and submit.';
+        this.statusBar.style.width = '100%';
+    }
+
+    startTimer() {
+        this.recordingTimer = setInterval(() => {
+            if (this.isRecording && !this.isPaused) {
+                const elapsed = Math.floor((Date.now() - this.recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+
+                // Calculate progress based on minimum seconds
+                const progress = Math.min((elapsed / this.minimumSeconds) * 100, 100);
+                this.statusBar.style.width = `${progress}%`;
+
+                // Change color when minimum is reached
+                if (elapsed >= this.minimumSeconds) {
+                    this.statusBar.style.background = '#28A745'; // Green
+                    this.recordStatus.textContent = `Recording... ${minutes}:${seconds.toString().padStart(2, '0')} ✓`;
+                } else {
+                    this.statusBar.style.background = 'var(--accent-color)'; // Orange
+                    const remaining = this.minimumSeconds - elapsed;
+                    this.recordStatus.textContent = `Recording... ${minutes}:${seconds.toString().padStart(2, '0')} (${remaining}s remaining)`;
+                }
+            }
+        }, 1000);
+    }
+
+    stopTimer() {
+        if (this.recordingTimer) {
+            clearInterval(this.recordingTimer);
+            this.recordingTimer = null;
+        }
+    }
+
+    async handleSubmit(event) {
+        event.preventDefault();
+
+        if (!this.recordedAudioBlob) {
+            this.showError('Please record your feedback first.');
+            return;
+        }
+
+        if (!this.volunteerSelect.value) {
+            this.showError('Please select your name.');
+            return;
+        }
+
+        this.submitBtn.disabled = true;
+        this.submitBtn.innerHTML = '<i class="bi bi-spinner-border spinner-border-sm"></i> Uploading...';
+
+        try {
+            await this.uploadToSupabase();
+            this.showSuccess();
+        } catch (error) {
+            console.error('Upload error:', error);
+            this.showError('Failed to upload feedback. Please try again.');
+        } finally {
+            this.submitBtn.disabled = false;
+            this.submitBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> Submit Feedback';
+        }
+    }
+
+    async uploadToSupabase() {
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        if (!this.selectedDate) {
+            throw new Error('Please select a date');
+        }
+
+        if (!this.selectedVolunteer) {
+            throw new Error('Please select a volunteer');
+        }
+
+        const studentIndex = this.studentSelect ? this.studentSelect.value : null;
+        if (!studentIndex && studentIndex !== '0') {
+            throw new Error('Please select a student');
+        }
+
+        // Get the selected student object
+        const selectedStudent = this.selectedVolunteer.students[studentIndex];
+        if (!selectedStudent) {
+            throw new Error('Invalid student selection');
+        }
+
+        try {
+            // Validate the audio file
+            this.storage.validateAudioFile(this.recordedAudioBlob);
+
+            // Get volunteer name for filename (convert to URL-friendly format)
+            const volunteerName = this.selectedVolunteer.name.toLowerCase().replace(/\s+/g, '-');
+
+            // Get staff for the selected date
+            const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
+            const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
+
+            // Upload to Supabase Storage with selected date, volunteer, student, and staff info
+            const result = await this.storage.uploadAudioFile(
+                this.recordedAudioBlob,
+                volunteerName,
+                this.selectedDate,
+                this.selectedVolunteer.name,
+                selectedStudent,
+                this.selectedVolunteer.id,  // Pass volunteer ID for relations
+                staff  // Pass staff array for the selected date
+            );
+
+            console.log('Upload successful:', result);
+            return result;
+
+        } catch (error) {
+            console.error('Upload failed:', error);
+            throw error;
+        }
+    }
+
+    showError(message) {
+        // Create or update error alert
+        this.showAlert(message, 'danger');
+    }
+
+    showSuccess() {
+        const volunteerName = this.volunteerSelect.options[this.volunteerSelect.selectedIndex].text;
+        this.showAlert(`Thank you ${volunteerName}! Your feedback has been submitted successfully.`, 'success');
+
+        // Reset form after successful submission
+        setTimeout(() => {
+            this.resetForNewRecording();
+            this.volunteerSelect.value = '';
+            this.onVolunteerSelected();
+        }, 3000);
+    }
+
+    showAlert(message, type) {
+        // Remove existing alerts
+        const existingAlerts = document.querySelectorAll('.alert-notification');
+        existingAlerts.forEach(alert => alert.remove());
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-notification d-flex align-items-center`;
+        alertDiv.innerHTML = `
+            <i class="bi bi-${type === 'success' ? 'check-circle-fill' : 'exclamation-triangle-fill'} me-3"></i>
+            <div>${message}</div>
+        `;
+
+        this.feedbackForm.insertBefore(alertDiv, this.feedbackForm.firstChild);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+}
+
+// Initialize the application when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new FeedbackRecorder();
+});

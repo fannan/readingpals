@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reading Pals - Feedback Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        .header-icon {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 20px;
+        }
+        .file-item {
+            background: white;
+            border-radius: 15px;
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+            margin-bottom: 15px;
+        }
+        .file-item:hover {
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        .volunteer-badge {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .date-badge {
+            background: #6c757d;
+            color: white;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 0.8rem;
+        }
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .refresh-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 15px;
+            padding: 10px 20px;
+            color: white;
+            transition: all 0.3s ease;
+        }
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        .stats-card {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .audio-player {
+            width: 100%;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-5">
+        <div class="row justify-content-center">
+            <div class="col-11 col-lg-10">
+                <div class="card main-card p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <div class="header-icon">
+                            <i class="bi bi-folder-open"></i>
+                        </div>
+                        <h1 class="h2 mb-1 text-primary">Feedback Admin</h1>
+                        <p class="text-muted mb-0">View and manage volunteer feedback recordings</p>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="stats-card text-center">
+                                <h3 class="mb-1" id="totalFiles">-</h3>
+                                <small>Total Recordings</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="stats-card text-center">
+                                <h3 class="mb-1" id="uniqueVolunteers">-</h3>
+                                <small>Active Volunteers</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="mb-0">Recent Feedback</h4>
+                        <button class="btn refresh-btn" id="refreshBtn">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Refresh
+                        </button>
+                    </div>
+
+                    <div id="loadingSection" class="text-center py-5">
+                        <div class="loading-spinner mb-3">
+                            <i class="bi bi-arrow-clockwise fs-2 text-primary"></i>
+                        </div>
+                        <p class="text-muted">Loading feedback files...</p>
+                    </div>
+
+                    <div id="filesSection" style="display: none;">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="searchInput" placeholder="Search by volunteer name or date...">
+                        </div>
+
+                        <div id="filesList">
+                            <!-- Files will be loaded here -->
+                        </div>
+
+                        <div id="noFiles" class="text-center py-5" style="display: none;">
+                            <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                            <h5 class="text-muted">No feedback files found</h5>
+                            <p class="text-muted">Recordings will appear here once volunteers submit feedback.</p>
+                        </div>
+                    </div>
+
+                    <div id="errorSection" class="alert alert-danger" style="display: none;">
+                        <h6><i class="bi bi-exclamation-triangle me-2"></i>Error Loading Files</h6>
+                        <p class="mb-0" id="errorMessage">Unable to load feedback files. Please check your connection and try again.</p>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="index.html" class="btn btn-outline-primary">
+                            <i class="bi bi-arrow-left me-2"></i>Back to Feedback Form
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="config.js"></script>
+    <script src="jwt-storage.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
