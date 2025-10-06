@@ -4,7 +4,7 @@ class SimpleSupabaseUpload {
         this.url = 'https://ygsekzeiirebuvzdbyxc.supabase.co';
         this.key = 'sb_publishable_5YGef3RddislRfWcJaHa2Q_CVvkj6sc';
         this.bucketName = 'feedback-recordings';
-        this.webhookUrl = 'https://tasks.sklabs.app/webhook/aefb9cf6-edd9-45a4-83f8-f4dbc8ad0a15';
+        this.webhookUrl = 'https://tasks.sklabs.app/webhook/2f7e4694-d6a9-4adc-bf3d-3cc68da6c79c';
     }
 
     async uploadAudioFile(audioBlob, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = []) {
