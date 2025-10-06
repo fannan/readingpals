@@ -73,7 +73,7 @@ class FeedbackRecorder {
     async loadAvailableDates() {
         try {
             console.log('Loading available dates from API...');
-            const response = await fetch('https://tasks.sklabs.app/webhook/94d3fc3e-1570-488e-b14c-4435e7e513fa');
+            const response = await fetch('https://tasks.sklabs.app/webhook/80337e94-93a5-407a-94d1-746efcbb4d3c');
 
             if (!response.ok) {
                 throw new Error(`API request failed: ${response.status}`);
