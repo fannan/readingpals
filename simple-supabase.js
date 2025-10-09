@@ -5,7 +5,8 @@ class SimpleSupabaseUpload {
         this.key = 'sb_publishable_5YGef3RddislRfWcJaHa2Q_CVvkj6sc';
         this.bucketName = 'feedback-recordings';
         this.webhookUrl = 'https://tasks.sklabs.app/webhook/2f7e4694-d6a9-4adc-bf3d-3cc68da6c79c';
-        this.claudeTranscribeUrl = 'https://ygsekzeiirebuvzdbyxc.supabase.co/rest/v1/rpc/exec';
+        // Cloudflare Worker URL for Anthropic vision API
+        this.claudeVisionWorkerUrl = 'https://reading-pals-vision.sean-b08.workers.dev';
     }
 
     async uploadAudioFile(audioBlob, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = []) {
@@ -449,14 +450,13 @@ class SimpleSupabaseUpload {
                 });
             }
 
-            // Call Cloudflare Worker that has access to claude_key secret
-            const response = await fetch(this.claudeTranscribeUrl, {
+            // Call Cloudflare Worker that uses claude_key secret to call Anthropic API
+            const response = await fetch(this.claudeVisionWorkerUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    action: 'transcribe_photos',
                     images: images,
                     prompt: "Please transcribe and describe everything you see in these images. Include all visible text, handwriting, drawings, diagrams, and any other relevant content. Be thorough and detailed."
                 })
@@ -468,10 +468,10 @@ class SimpleSupabaseUpload {
             }
 
             const result = await response.json();
-            return result.transcription || result.text || 'No transcription available';
+            return result.transcription || 'No transcription available';
 
         } catch (error) {
-            console.error('Claude transcription error:', error);
+            console.error('Anthropic vision transcription error:', error);
             throw error;
         }
     }
