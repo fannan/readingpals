@@ -2,6 +2,8 @@ class FeedbackAudit {
     constructor() {
         this.availableDates = [];
         this.volunteers = [];
+        this.allStudents = [];
+        this.showAllStudents = false;
         this.selectedDate = null;
         this.feedbackData = [];
 
@@ -62,6 +64,23 @@ class FeedbackAudit {
                     name: volunteer.name,
                     students: volunteer.students || []
                 }));
+            }
+
+            // Extract all students from all volunteers into a single list
+            const allStudentsMap = new Map();
+            this.volunteers.forEach(volunteer => {
+                volunteer.students.forEach(student => {
+                    if (!allStudentsMap.has(student.id)) {
+                        allStudentsMap.set(student.id, student);
+                    }
+                });
+            });
+            this.allStudents = Array.from(allStudentsMap.values());
+
+            // Get showAllStudents flag from config
+            if (typeof data.show_all_students === 'boolean') {
+                this.showAllStudents = data.show_all_students;
+                console.log('Show all students:', this.showAllStudents);
             }
 
             this.populateDateDropdown();
@@ -185,13 +204,32 @@ class FeedbackAudit {
     buildAuditGrid(selectedDateObj) {
         this.auditGrid.innerHTML = '';
 
+        console.log('Building audit grid for date:', this.selectedDate);
+        console.log('Selected date object:', selectedDateObj);
+        console.log('All volunteers:', this.volunteers);
+        console.log('Feedback data:', this.feedbackData);
+
         // Get volunteers scheduled for this date
         const scheduledVolunteerIds = selectedDateObj.volunteers.map(v => v.id);
+        console.log('Scheduled volunteer IDs for this date:', scheduledVolunteerIds);
+
         const scheduledVolunteers = this.volunteers.filter(v =>
             scheduledVolunteerIds.includes(v.id)
         );
 
+        console.log('Scheduled volunteers:', scheduledVolunteers);
+
         if (scheduledVolunteers.length === 0) {
+            console.warn('No volunteers found for this date. Checking if we should show all volunteers with feedback...');
+
+            // If no volunteers are scheduled but we have feedback data,
+            // show all volunteers who have any students
+            if (this.feedbackData.length > 0) {
+                console.log('Using all volunteers since we have feedback data');
+                this.buildGridFromAllVolunteers();
+                return;
+            }
+
             this.showEmptyState('No volunteers scheduled for this date');
             return;
         }
@@ -206,15 +244,17 @@ class FeedbackAudit {
 
         // Build a section for each volunteer
         sortedVolunteers.forEach(volunteer => {
-            if (!volunteer.students || volunteer.students.length === 0) {
+            const studentsToCount = this.showAllStudents ? this.allStudents : volunteer.students;
+
+            if (!studentsToCount || studentsToCount.length === 0) {
                 return; // Skip volunteers with no students
             }
 
             const section = this.createVolunteerSection(volunteer);
             this.auditGrid.appendChild(section);
 
-            totalPairs += volunteer.students.length;
-            completedPairs += volunteer.students.filter(student =>
+            totalPairs += studentsToCount.length;
+            completedPairs += studentsToCount.filter(student =>
                 this.hasFeedback(volunteer.id, student.id)
             ).length;
         });
@@ -242,8 +282,11 @@ class FeedbackAudit {
         const studentList = document.createElement('div');
         studentList.className = 'student-list';
 
+        // Use all students if showAllStudents is true, otherwise use volunteer's assigned students
+        const studentsToShow = this.showAllStudents ? this.allStudents : volunteer.students;
+
         // Sort students alphabetically
-        const sortedStudents = [...volunteer.students].sort((a, b) =>
+        const sortedStudents = [...studentsToShow].sort((a, b) =>
             a.name.localeCompare(b.name)
         );
 
@@ -337,6 +380,45 @@ class FeedbackAudit {
                 messageP.textContent = message;
             }
         }
+    }
+
+    buildGridFromAllVolunteers() {
+        // Fallback: show all volunteers who have students
+        const volunteersWithStudents = this.volunteers.filter(v =>
+            v.students && v.students.length > 0
+        );
+
+        if (volunteersWithStudents.length === 0) {
+            this.showEmptyState('No volunteers with students found');
+            return;
+        }
+
+        // Sort volunteers alphabetically
+        const sortedVolunteers = [...volunteersWithStudents].sort((a, b) =>
+            a.name.localeCompare(b.name)
+        );
+
+        let totalPairs = 0;
+        let completedPairs = 0;
+
+        // Build a section for each volunteer
+        sortedVolunteers.forEach(volunteer => {
+            const section = this.createVolunteerSection(volunteer);
+            this.auditGrid.appendChild(section);
+
+            totalPairs += volunteer.students.length;
+            completedPairs += volunteer.students.filter(student =>
+                this.hasFeedback(volunteer.id, student.id)
+            ).length;
+        });
+
+        // Update stats
+        this.updateStats(totalPairs, completedPairs);
+
+        // Show the grid
+        this.hideLoading();
+        this.auditGrid.style.display = 'grid';
+        this.statsSection.style.display = 'block';
     }
 
     showError(message) {
