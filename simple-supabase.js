@@ -312,9 +312,10 @@ class SimpleSupabaseUpload {
                     name: s.name
                 })),
                 feedback: {
-                    url: audioFileUrl,
+                    urls: [audioFileUrl],  // Array with single audio URL
                     transcript: transcription || 'No transcription available',
-                    fileSize: fileSize
+                    fileSize: fileSize,
+                    type: 'audio'  // Indicate this is audio feedback
                 },
                 date: submissionDate
             };
