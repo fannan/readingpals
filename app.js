@@ -549,27 +549,76 @@ class FeedbackRecorder {
         this.loadingSection.style.display = 'block';
 
         try {
-            // TODO: Upload photos to storage
-            console.log('Uploading', this.uploadedPhotos.length, 'photos');
+            await this.uploadPhotosToSupabase();
 
-            // For now, just show success
-            setTimeout(() => {
-                this.loadingSection.style.display = 'none';
-                alert(`Thanks! ${this.uploadedPhotos.length} photo${this.uploadedPhotos.length !== 1 ? 's have' : ' has'} been submitted successfully.`);
+            // Show success
+            this.loadingSection.style.display = 'none';
+            alert(`Thanks! ${this.uploadedPhotos.length} photo${this.uploadedPhotos.length !== 1 ? 's have' : ' has'} been submitted successfully.`);
 
-                // Reset
-                this.uploadedPhotos = [];
-                this.renderPhotoGrid();
-                this.studentSelect.value = '';
-                this.modeSelector.style.display = 'none';
-                this.photoSection.style.display = 'none';
-            }, 1500);
+            // Reset
+            this.uploadedPhotos = [];
+            this.renderPhotoGrid();
+            this.studentSelect.value = '';
+            this.modeSelector.style.display = 'none';
+            this.photoSection.style.display = 'none';
         } catch (error) {
             console.error('Upload error:', error);
             alert('Failed to upload photos. Please try again.');
             this.loadingSection.style.display = 'none';
             this.photoSection.style.display = 'block';
             this.modeSelector.style.display = 'block';
+        }
+    }
+
+    async uploadPhotosToSupabase() {
+        if (!this.storage) {
+            throw new Error('Storage not initialized');
+        }
+
+        if (!this.selectedDate) {
+            throw new Error('Please select a date');
+        }
+
+        if (!this.selectedVolunteer) {
+            throw new Error('Please select a volunteer');
+        }
+
+        const studentIndex = this.studentSelect ? this.studentSelect.value : null;
+        if (!studentIndex && studentIndex !== '0') {
+            throw new Error('Please select a student');
+        }
+
+        // Get the selected student object from the current students list
+        const selectedStudent = this.currentStudentsList[studentIndex];
+        if (!selectedStudent) {
+            throw new Error('Invalid student selection');
+        }
+
+        try {
+            // Get volunteer name for filename (convert to URL-friendly format)
+            const volunteerName = this.selectedVolunteer.name.toLowerCase().replace(/\s+/g, '-');
+
+            // Get staff for the selected date
+            const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
+            const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
+
+            // Upload photos to Supabase Storage with Claude transcription
+            const result = await this.storage.uploadPhotoFiles(
+                this.uploadedPhotos,
+                volunteerName,
+                this.selectedDate,
+                this.selectedVolunteer.name,
+                selectedStudent,
+                this.selectedVolunteer.id,
+                staff
+            );
+
+            console.log('Photo upload successful:', result);
+            return result;
+
+        } catch (error) {
+            console.error('Photo upload failed:', error);
+            throw error;
         }
     }
 

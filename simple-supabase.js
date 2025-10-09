@@ -5,6 +5,7 @@ class SimpleSupabaseUpload {
         this.key = 'sb_publishable_5YGef3RddislRfWcJaHa2Q_CVvkj6sc';
         this.bucketName = 'feedback-recordings';
         this.webhookUrl = 'https://tasks.sklabs.app/webhook/2f7e4694-d6a9-4adc-bf3d-3cc68da6c79c';
+        this.claudeTranscribeUrl = 'https://ygsekzeiirebuvzdbyxc.supabase.co/rest/v1/rpc/exec';
     }
 
     async uploadAudioFile(audioBlob, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = []) {
@@ -334,6 +335,201 @@ class SimpleSupabaseUpload {
 
             const result = await response.json();
             console.log('✅ Webhook: Data sent successfully:', result);
+            return result;
+
+        } catch (error) {
+            console.error('Webhook error:', error);
+            throw error;
+        }
+    }
+
+    async uploadPhotoFiles(photoBlobs, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = []) {
+        try {
+            console.log('Uploading', photoBlobs.length, 'photos to Supabase...');
+
+            const uploadedPhotos = [];
+            const serviceKey = 'sb_secret_IZ0xyxIUyILyGv0fA5DiVA_dUDAXsSo';
+
+            // Upload each photo to Supabase
+            for (let i = 0; i < photoBlobs.length; i++) {
+                const photoBlob = photoBlobs[i];
+                const fileName = this.generatePhotoFileName(volunteerName, i);
+                const uploadUrl = `${this.url}/storage/v1/object/${this.bucketName}/${fileName}`;
+
+                console.log(`Uploading photo ${i + 1}/${photoBlobs.length}: ${fileName}`);
+
+                const response = await fetch(uploadUrl, {
+                    method: 'POST',
+                    headers: {
+                        'apikey': serviceKey,
+                        'Authorization': `Bearer ${serviceKey}`,
+                        'Content-Type': photoBlob.type || 'image/jpeg',
+                        'x-upsert': 'false'
+                    },
+                    body: photoBlob
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Photo upload failed: ${response.status} - ${errorText}`);
+                }
+
+                const fileUrl = `${this.url}/storage/v1/object/public/${this.bucketName}/${fileName}`;
+                uploadedPhotos.push({
+                    fileName,
+                    fileUrl,
+                    size: photoBlob.size,
+                    blob: photoBlob
+                });
+            }
+
+            console.log('All photos uploaded successfully');
+
+            // Get transcription from Claude API
+            let transcription = '';
+            try {
+                transcription = await this.getPhotoTranscription(photoBlobs);
+                console.log('Claude transcription:', transcription);
+            } catch (transcriptionError) {
+                console.warn('Claude transcription failed:', transcriptionError);
+                transcription = 'Transcription unavailable';
+            }
+
+            // Send to webhook with photo URLs
+            try {
+                const photoUrls = uploadedPhotos.map(p => p.fileUrl);
+                const totalSize = uploadedPhotos.reduce((sum, p) => sum + p.size, 0);
+
+                const webhookResult = await this.sendPhotosToWebhook(
+                    volunteerId,
+                    volunteerDisplayName || volunteerName,
+                    photoUrls,
+                    transcription,
+                    totalSize,
+                    sessionDate,
+                    student,
+                    staff
+                );
+                console.log('Webhook sent successfully:', webhookResult);
+            } catch (webhookError) {
+                console.warn('Webhook failed:', webhookError);
+            }
+
+            return {
+                success: true,
+                photos: uploadedPhotos,
+                transcription
+            };
+
+        } catch (error) {
+            console.error('Photo upload error:', error);
+            throw error;
+        }
+    }
+
+    generatePhotoFileName(volunteerName, index) {
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+        const timestamp = now.getTime();
+        return `${dateStr}/${volunteerName}-photo-${index + 1}-${timeStr}-${timestamp}.jpg`;
+    }
+
+    async getPhotoTranscription(photoBlobs) {
+        try {
+            console.log('Getting transcription from Cloudflare Worker for', photoBlobs.length, 'photos...');
+
+            // Convert photos to base64
+            const images = [];
+            for (const photoBlob of photoBlobs) {
+                const base64 = await this.blobToBase64(photoBlob);
+                images.push({
+                    data: base64,
+                    type: photoBlob.type || "image/jpeg"
+                });
+            }
+
+            // Call Cloudflare Worker that has access to claude_key secret
+            const response = await fetch(this.claudeTranscribeUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'transcribe_photos',
+                    images: images,
+                    prompt: "Please transcribe and describe everything you see in these images. Include all visible text, handwriting, drawings, diagrams, and any other relevant content. Be thorough and detailed."
+                })
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Cloudflare Worker error: ${response.status} - ${errorText}`);
+            }
+
+            const result = await response.json();
+            return result.transcription || result.text || 'No transcription available';
+
+        } catch (error) {
+            console.error('Claude transcription error:', error);
+            throw error;
+        }
+    }
+
+    blobToBase64(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    async sendPhotosToWebhook(volunteerId, volunteerName, photoUrls, transcription, totalFileSize = 0, sessionDate = null, student = null, staff = []) {
+        try {
+            console.log('Sending photo data to webhook...');
+
+            const submissionDate = sessionDate || new Date().toISOString().split('T')[0];
+
+            const webhookData = {
+                volunteer: {
+                    id: volunteerId,
+                    name: volunteerName
+                },
+                student: student ? {
+                    id: student.id,
+                    name: student.name
+                } : null,
+                staff: staff.map(s => ({
+                    id: s.id,
+                    name: s.name
+                })),
+                feedback: {
+                    urls: photoUrls,  // Array of photo URLs instead of single URL
+                    transcript: transcription || 'No transcription available',
+                    fileSize: totalFileSize,
+                    type: 'photos'  // Indicate this is photo feedback
+                },
+                date: submissionDate
+            };
+
+            console.log('Sending to webhook:', webhookData);
+
+            const response = await fetch(this.webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(webhookData)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Webhook error: ${response.status} - ${errorText}`);
+            }
+
+            const result = await response.json();
+            console.log('✅ Webhook: Photo data sent successfully:', result);
             return result;
 
         } catch (error) {
