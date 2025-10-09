@@ -459,7 +459,7 @@ class SimpleSupabaseUpload {
                 },
                 body: JSON.stringify({
                     images: images,
-                    prompt: "Please transcribe and describe everything you see in these images. Include all visible text, handwriting, drawings, diagrams, and any other relevant content. Be thorough and detailed."
+                    prompt: "Transcribe EXACTLY word-for-word all text visible in these images. Include:\n\n1. All printed text - copy it exactly as written\n2. All handwritten text - transcribe it exactly, including any spelling errors or unclear words (mark unclear words with [unclear])\n3. All questions, answers, and instructions on worksheets\n4. All labels, captions, and annotations\n5. The layout and structure (indicate which text is a title, question number, answer, etc.)\n\nDo NOT summarize or paraphrase. Copy the text exactly as it appears. For worksheets, preserve the question-answer structure. For diagrams, transcribe any labels or text within them."
                 })
             });
 
