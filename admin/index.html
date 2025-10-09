@@ -201,12 +201,163 @@
             font-size: clamp(1rem, 2.5vw, 1.2rem);
         }
 
+        .student-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .student-status .status-text {
+            display: flex;
+            align-items: center;
+            gap: clamp(0.35rem, 1vw, 0.5rem);
+        }
+
         .student-item.completed .student-status {
             color: var(--success-color);
         }
 
         .student-item.missing .student-status {
             color: var(--danger-color);
+        }
+
+        .upload-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.4rem 0.65rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .upload-btn:hover {
+            background: #084A6F;
+            transform: scale(1.05);
+        }
+
+        .upload-btn i {
+            font-size: 1rem;
+        }
+
+        /* Upload Modal */
+        .upload-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .upload-modal.show {
+            display: flex;
+        }
+
+        .upload-modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            max-width: 90%;
+            width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .upload-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .upload-modal-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-dark);
+        }
+
+        .photo-upload-label {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-light);
+            color: var(--primary-color);
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 1rem;
+        }
+
+        .photo-upload-label:hover {
+            border-color: var(--primary-color);
+            background: #E8F4F8;
+        }
+
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .photo-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid var(--border-color);
+        }
+
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .photo-item .remove-btn {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .photo-count {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-modal-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .upload-modal-actions .btn {
+            flex: 1;
         }
 
         .empty-state {
@@ -293,6 +444,30 @@
 
             <div id="auditGrid" class="audit-grid" style="display: none;">
                 <!-- Volunteer sections will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="upload-modal" id="uploadModal">
+        <div class="upload-modal-content">
+            <div class="upload-modal-header">
+                <h3 id="uploadModalTitle">Upload Photos</h3>
+            </div>
+
+            <input type="file" id="photoInput" accept="image/*" multiple style="display: none;">
+            <label for="photoInput" class="photo-upload-label">
+                <i class="bi bi-images"></i> Add Photos
+            </label>
+
+            <div class="photo-grid" id="photoGrid"></div>
+            <div class="photo-count" id="photoCount"></div>
+
+            <div class="upload-modal-actions">
+                <button class="btn btn-outline-secondary" id="cancelUploadBtn">Cancel</button>
+                <button class="btn btn-primary" id="submitPhotosBtn" style="display: none;">
+                    <i class="bi bi-cloud-upload"></i> Submit Photos
+                </button>
             </div>
         </div>
     </div>

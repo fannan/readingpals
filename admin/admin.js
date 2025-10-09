@@ -14,6 +14,7 @@ class FeedbackAudit {
         this.initializeElements();
         this.bindEvents();
         this.loadAvailableDates();
+        this.initializeStorage();
     }
 
     initializeElements() {
@@ -29,11 +30,45 @@ class FeedbackAudit {
         this.completedCount = document.getElementById('completedCount');
         this.missingCount = document.getElementById('missingCount');
         this.completionRate = document.getElementById('completionRate');
+
+        // Photo upload modal elements
+        this.uploadModal = document.getElementById('uploadModal');
+        this.uploadModalTitle = document.getElementById('uploadModalTitle');
+        this.photoInput = document.getElementById('photoInput');
+        this.photoGrid = document.getElementById('photoGrid');
+        this.photoCount = document.getElementById('photoCount');
+        this.submitPhotosBtn = document.getElementById('submitPhotosBtn');
+        this.cancelUploadBtn = document.getElementById('cancelUploadBtn');
+
+        // Current upload context
+        this.currentUploadContext = null;
+        this.uploadedPhotos = [];
+        this.storage = null;
     }
 
     bindEvents() {
         this.dateSelect.addEventListener('change', () => this.onDateSelected());
         this.refreshBtn.addEventListener('click', () => this.refreshAudit());
+
+        // Photo upload events
+        this.photoInput.addEventListener('change', (e) => this.handlePhotoUpload(e));
+        this.submitPhotosBtn.addEventListener('click', () => this.submitPhotos());
+        this.cancelUploadBtn.addEventListener('click', () => this.closeUploadModal());
+    }
+
+    initializeStorage() {
+        try {
+            if (window.SimpleSupabaseUpload) {
+                this.storage = new SimpleSupabaseUpload();
+                console.log('Storage initialized');
+            } else {
+                console.warn('SimpleSupabaseUpload not available, retrying...');
+                setTimeout(() => this.initializeStorage(), 500);
+            }
+        } catch (error) {
+            console.warn('Storage initialization failed:', error);
+            setTimeout(() => this.initializeStorage(), 1000);
+        }
     }
 
     async loadAvailableDates() {
@@ -352,32 +387,161 @@ class FeedbackAudit {
 
         item.className = `student-item ${hasSubmitted ? 'completed' : 'missing'}`;
 
-        // Make clickable - open feedback form in new tab
-        const feedbackUrl = `../index.html?date=${this.selectedDate}&volunteer=${volunteer.id}&student=${student.id}`;
-        item.style.cursor = 'pointer';
-        item.addEventListener('click', () => {
-            window.open(feedbackUrl, '_blank');
-        });
-
         // Student name
         const nameDiv = document.createElement('div');
         nameDiv.className = 'student-name';
         nameDiv.textContent = student.name;
         item.appendChild(nameDiv);
 
-        // Status
+        // Status with upload button for missing items
         const statusDiv = document.createElement('div');
         statusDiv.className = 'student-status';
 
         if (hasSubmitted) {
             statusDiv.innerHTML = '<i class="bi bi-check-circle-fill"></i> Submitted';
         } else {
-            statusDiv.innerHTML = '<i class="bi bi-x-circle-fill"></i> Missing';
+            statusDiv.innerHTML = `
+                <span class="status-text">
+                    <i class="bi bi-x-circle-fill"></i> Missing
+                </span>
+                <button class="upload-btn" title="Upload photos">
+                    <i class="bi bi-cloud-upload-fill"></i>
+                </button>
+            `;
+
+            // Add click handler to upload button
+            const uploadBtn = statusDiv.querySelector('.upload-btn');
+            uploadBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.openUploadModal(volunteer, student);
+            });
         }
 
         item.appendChild(statusDiv);
 
         return item;
+    }
+
+    openUploadModal(volunteer, student) {
+        this.currentUploadContext = {
+            volunteer,
+            student,
+            date: this.selectedDate
+        };
+
+        this.uploadModalTitle.textContent = `Upload Photos: ${student.name}`;
+        this.uploadedPhotos = [];
+        this.photoGrid.innerHTML = '';
+        this.photoCount.textContent = '';
+        this.submitPhotosBtn.style.display = 'none';
+
+        this.uploadModal.classList.add('show');
+    }
+
+    closeUploadModal() {
+        this.uploadModal.classList.remove('show');
+        this.currentUploadContext = null;
+        this.uploadedPhotos = [];
+        this.photoGrid.innerHTML = '';
+        this.photoCount.textContent = '';
+    }
+
+    handlePhotoUpload(event) {
+        const files = Array.from(event.target.files);
+
+        files.forEach(file => {
+            if (file && file.type.startsWith('image/')) {
+                this.uploadedPhotos.push(file);
+            }
+        });
+
+        this.renderPhotoGrid();
+        // Clear the input so the same file can be selected again
+        event.target.value = '';
+    }
+
+    renderPhotoGrid() {
+        this.photoGrid.innerHTML = '';
+
+        this.uploadedPhotos.forEach((file, index) => {
+            const photoItem = document.createElement('div');
+            photoItem.className = 'photo-item';
+
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.alt = `Photo ${index + 1}`;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = () => this.removePhoto(index);
+
+            photoItem.appendChild(img);
+            photoItem.appendChild(removeBtn);
+            this.photoGrid.appendChild(photoItem);
+        });
+
+        // Update count and show/hide submit button
+        const count = this.uploadedPhotos.length;
+        if (count > 0) {
+            this.photoCount.textContent = `${count} photo${count !== 1 ? 's' : ''} added`;
+            this.submitPhotosBtn.style.display = 'block';
+        } else {
+            this.photoCount.textContent = '';
+            this.submitPhotosBtn.style.display = 'none';
+        }
+    }
+
+    removePhoto(index) {
+        this.uploadedPhotos.splice(index, 1);
+        this.renderPhotoGrid();
+    }
+
+    async submitPhotos() {
+        if (this.uploadedPhotos.length === 0 || !this.currentUploadContext) {
+            return;
+        }
+
+        const { volunteer, student, date } = this.currentUploadContext;
+
+        // Disable submit button and show loading
+        this.submitPhotosBtn.disabled = true;
+        this.submitPhotosBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading...';
+
+        try {
+            // Get volunteer name for filename
+            const volunteerName = volunteer.name.toLowerCase().replace(/\s+/g, '-');
+
+            // Get staff for the selected date
+            const selectedDateObj = this.availableDates.find(d => d.date === date);
+            const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
+
+            // Upload photos
+            await this.storage.uploadPhotoFiles(
+                this.uploadedPhotos,
+                volunteerName,
+                date,
+                volunteer.name,
+                student,
+                volunteer.id,
+                staff
+            );
+
+            // Success!
+            alert(`Successfully submitted ${this.uploadedPhotos.length} photo${this.uploadedPhotos.length !== 1 ? 's' : ''} for ${student.name}`);
+            this.closeUploadModal();
+
+            // Refresh the audit to update the status
+            await this.refreshAudit();
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Failed to upload photos. Please try again.');
+
+            // Re-enable submit button
+            this.submitPhotosBtn.disabled = false;
+            this.submitPhotosBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> Submit Photos';
+        }
     }
 
     hasFeedback(volunteerId, studentId) {
