@@ -317,6 +317,7 @@ class SimpleSupabaseUpload {
                     fileSize: fileSize,
                     type: 'audio'  // Indicate this is audio feedback
                 },
+                input_type: 'Audio',
                 date: submissionDate
             };
 
@@ -511,6 +512,7 @@ class SimpleSupabaseUpload {
                     fileSize: totalFileSize,
                     type: 'photos'  // Indicate this is photo feedback
                 },
+                input_type: 'Photo',
                 date: submissionDate
             };
 
