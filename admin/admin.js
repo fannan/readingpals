@@ -155,8 +155,26 @@ class FeedbackAudit {
             }
 
             const result = await response.json();
-            this.feedbackData = Array.isArray(result) ? result : [];
-            console.log('Loaded feedback data:', this.feedbackData);
+            const rawData = Array.isArray(result) ? result : [];
+
+            // Deduplicate based on volunteer-student pairs
+            const seenPairs = new Set();
+            this.feedbackData = rawData.filter(item => {
+                const volunteerId = item.property_volunteer?.[0];
+                const studentId = item.property_student?.[0];
+
+                if (!volunteerId || !studentId) return false;
+
+                const pairKey = `${volunteerId}-${studentId}`;
+                if (seenPairs.has(pairKey)) {
+                    return false; // Duplicate, skip it
+                }
+
+                seenPairs.add(pairKey);
+                return true;
+            });
+
+            console.log('Loaded and deduped feedback data:', this.feedbackData.length, 'items');
 
         } catch (error) {
             console.warn('Failed to load feedback data:', error);
@@ -268,9 +286,13 @@ class FeedbackAudit {
 
     hasFeedback(volunteerId, studentId) {
         // Check if feedback exists for this volunteer-student pair
+        // The API returns property_volunteer and property_student as arrays
         return this.feedbackData.some(feedback => {
-            return feedback.volunteer?.id === volunteerId &&
-                   feedback.student?.id === studentId;
+            const feedbackVolunteerId = feedback.property_volunteer?.[0];
+            const feedbackStudentId = feedback.property_student?.[0];
+
+            return feedbackVolunteerId === volunteerId &&
+                   feedbackStudentId === studentId;
         });
     }
 
