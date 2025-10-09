@@ -99,9 +99,9 @@ class FeedbackAudit {
             return;
         }
 
-        // Sort dates in descending order (most recent first)
+        // Sort dates in ascending order (oldest first)
         const sortedDates = [...this.availableDates].sort((a, b) => {
-            return new Date(b.date) - new Date(a.date);
+            return new Date(a.date) - new Date(b.date);
         });
 
         sortedDates.forEach(dateObj => {
@@ -351,6 +351,13 @@ class FeedbackAudit {
         const hasSubmitted = this.hasFeedback(volunteer.id, student.id);
 
         item.className = `student-item ${hasSubmitted ? 'completed' : 'missing'}`;
+
+        // Make clickable - open feedback form in new tab
+        const feedbackUrl = `../index.html?date=${this.selectedDate}&volunteer=${volunteer.id}&student=${student.id}`;
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => {
+            window.open(feedbackUrl, '_blank');
+        });
 
         // Student name
         const nameDiv = document.createElement('div');
