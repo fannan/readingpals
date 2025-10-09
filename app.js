@@ -14,6 +14,8 @@ class FeedbackRecorder {
         this.selectedVolunteer = null;
         this.minimumSeconds = 30; // Default minimum recording time
         this.showAllStudents = false; // Flag to show all students or only volunteer's students
+        this.feedbackMode = 'audio'; // 'audio' or 'photo'
+        this.uploadedPhotos = []; // Array to store photo files
 
         this.initializeElements();
         this.bindEvents();
@@ -55,19 +57,36 @@ class FeedbackRecorder {
         this.feedbackForm = document.getElementById('feedbackForm');
         this.staffDisplay = document.getElementById('staffDisplay');
         this.staffNames = document.getElementById('staffNames');
+
+        // Photo mode elements
+        this.modeSelector = document.getElementById('modeSelector');
+        this.audioModeBtn = document.getElementById('audioModeBtn');
+        this.photoModeBtn = document.getElementById('photoModeBtn');
+        this.photoSection = document.getElementById('photoSection');
+        this.photoInput = document.getElementById('photoInput');
+        this.photoGrid = document.getElementById('photoGrid');
+        this.photoCount = document.getElementById('photoCount');
+        this.photoActions = document.getElementById('photoActions');
+        this.submitPhotosBtn = document.getElementById('submitPhotosBtn');
     }
 
     bindEvents() {
         this.dateSelect.addEventListener('change', () => this.onDateSelected());
         this.volunteerSelect.addEventListener('change', () => this.onVolunteerSelected());
         if (this.studentSelect) {
-            this.studentSelect.addEventListener('change', () => this.updateRecordButtonState());
+            this.studentSelect.addEventListener('change', () => this.onStudentSelected());
         }
         this.recordBtn.addEventListener('click', () => this.startRecording());
         this.pauseBtn.addEventListener('click', () => this.togglePauseRecording());
         this.stopBtn.addEventListener('click', () => this.stopRecording());
         this.reRecordBtn.addEventListener('click', () => this.resetForNewRecording());
         this.feedbackForm.addEventListener('submit', (e) => this.handleSubmit(e));
+
+        // Photo mode events
+        this.audioModeBtn.addEventListener('click', () => this.switchMode('audio'));
+        this.photoModeBtn.addEventListener('click', () => this.switchMode('photo'));
+        this.photoInput.addEventListener('change', (e) => this.handlePhotoUpload(e));
+        this.submitPhotosBtn.addEventListener('click', () => this.submitPhotos());
     }
 
     async loadAvailableDates() {
@@ -283,7 +302,7 @@ class FeedbackRecorder {
             this.studentSelect.parentElement.style.display = 'none';
             this.studentSelect.value = '';
         }
-        this.updateRecordButtonState();
+        this.onStudentSelected();
 
         // Update staff display
         if (this.selectedDate) {
@@ -339,7 +358,7 @@ class FeedbackRecorder {
                         );
                         if (studentIndex !== -1 && this.studentSelect) {
                             this.studentSelect.value = studentIndex;
-                            this.updateRecordButtonState();
+                            this.onStudentSelected();
                         }
                     }, 100); // Small delay to ensure dropdown is populated
                 }
@@ -375,7 +394,7 @@ class FeedbackRecorder {
         }
 
         // Enable record button only if both volunteer and student are selected
-        this.updateRecordButtonState();
+        this.onStudentSelected();
     }
 
     populateStudentDropdown(students) {
@@ -406,17 +425,27 @@ class FeedbackRecorder {
         console.log('Student dropdown populated with', students.length, 'students');
     }
 
-    updateRecordButtonState() {
+    onStudentSelected() {
         const volunteerSelected = this.volunteerSelect.value !== '';
         const studentSelected = this.studentSelect && this.studentSelect.value !== '';
         const isReady = volunteerSelected && studentSelected;
 
-        // Show/hide record section based on student selection
+        // Show/hide mode selector based on student selection
         if (studentSelected) {
-            this.recordSection.style.display = 'block';
-            this.recordBtn.disabled = !isReady;
+            this.modeSelector.style.display = 'block';
+            // Show the appropriate section based on current mode
+            if (this.feedbackMode === 'audio') {
+                this.recordSection.style.display = 'block';
+                this.photoSection.style.display = 'none';
+                this.recordBtn.disabled = !isReady;
+            } else {
+                this.photoSection.style.display = 'block';
+                this.recordSection.style.display = 'none';
+            }
         } else {
+            this.modeSelector.style.display = 'none';
             this.recordSection.style.display = 'none';
+            this.photoSection.style.display = 'none';
         }
 
         if (isReady) {
@@ -428,6 +457,121 @@ class FeedbackRecorder {
         } else {
             this.recordStatus.textContent = 'Select your name to start recording';
             this.recordBtn.disabled = true;
+        }
+    }
+
+    switchMode(mode) {
+        this.feedbackMode = mode;
+
+        // Update button states
+        if (mode === 'audio') {
+            this.audioModeBtn.classList.add('active');
+            this.photoModeBtn.classList.remove('active');
+            this.recordSection.style.display = 'block';
+            this.photoSection.style.display = 'none';
+        } else {
+            this.photoModeBtn.classList.add('active');
+            this.audioModeBtn.classList.remove('active');
+            this.photoSection.style.display = 'block';
+            this.recordSection.style.display = 'none';
+        }
+    }
+
+    handlePhotoUpload(event) {
+        const files = Array.from(event.target.files);
+
+        files.forEach(file => {
+            if (file && file.type.startsWith('image/')) {
+                this.uploadedPhotos.push(file);
+            }
+        });
+
+        this.renderPhotoGrid();
+        // Clear the input so the same file can be selected again
+        event.target.value = '';
+    }
+
+    renderPhotoGrid() {
+        this.photoGrid.innerHTML = '';
+
+        this.uploadedPhotos.forEach((file, index) => {
+            const photoItem = document.createElement('div');
+            photoItem.className = 'photo-item';
+
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.alt = `Photo ${index + 1}`;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-btn';
+            removeBtn.innerHTML = '×';
+            removeBtn.onclick = () => this.removePhoto(index);
+
+            photoItem.appendChild(img);
+            photoItem.appendChild(removeBtn);
+            this.photoGrid.appendChild(photoItem);
+        });
+
+        // Update count and show/hide submit button
+        const count = this.uploadedPhotos.length;
+        if (count > 0) {
+            this.photoCount.textContent = `${count} photo${count !== 1 ? 's' : ''} added`;
+            this.photoActions.style.display = 'block';
+        } else {
+            this.photoCount.textContent = '';
+            this.photoActions.style.display = 'none';
+        }
+    }
+
+    removePhoto(index) {
+        this.uploadedPhotos.splice(index, 1);
+        this.renderPhotoGrid();
+    }
+
+    async submitPhotos() {
+        if (this.uploadedPhotos.length === 0) {
+            alert('Please add at least one photo before submitting.');
+            return;
+        }
+
+        if (!this.selectedVolunteer) {
+            alert('Please select a volunteer.');
+            return;
+        }
+
+        const studentIndex = this.studentSelect ? this.studentSelect.value : null;
+        if (!studentIndex && studentIndex !== '0') {
+            alert('Please select a student.');
+            return;
+        }
+
+        // Show loading
+        this.photoSection.style.display = 'none';
+        this.modeSelector.style.display = 'none';
+        this.loadingSection.style.display = 'block';
+
+        try {
+            // TODO: Upload photos to storage
+            console.log('Uploading', this.uploadedPhotos.length, 'photos');
+
+            // For now, just show success
+            setTimeout(() => {
+                this.loadingSection.style.display = 'none';
+                alert(`Thanks! ${this.uploadedPhotos.length} photo${this.uploadedPhotos.length !== 1 ? 's have' : ' has'} been submitted successfully.`);
+
+                // Reset
+                this.uploadedPhotos = [];
+                this.renderPhotoGrid();
+                this.studentSelect.value = '';
+                this.modeSelector.style.display = 'none';
+                this.photoSection.style.display = 'none';
+            }, 1500);
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Failed to upload photos. Please try again.');
+            this.loadingSection.style.display = 'none';
+            this.photoSection.style.display = 'block';
+            this.modeSelector.style.display = 'block';
         }
     }
 
@@ -693,7 +837,7 @@ class FeedbackRecorder {
         // Reset to volunteer selected state (clear student selection)
         this.resetForNewRecording();
         this.studentSelect.value = '';
-        this.updateRecordButtonState();
+        this.onStudentSelected();
     }
 
     showAlert(message, type) {
