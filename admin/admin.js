@@ -110,6 +110,52 @@ class FeedbackAudit {
             option.textContent = this.formatDateForDisplay(dateObj);
             this.dateSelect.appendChild(option);
         });
+
+        // Pre-select the closest future date
+        this.selectClosestFutureDate();
+    }
+
+    selectClosestFutureDate() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Find the closest date that is today or in the future
+        let closestDateObj = null;
+        let minDiff = Infinity;
+
+        this.availableDates.forEach(dateObj => {
+            // Parse date as local time to avoid timezone issues
+            const [year, month, day] = dateObj.date.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            date.setHours(0, 0, 0, 0);
+
+            const diff = date - today;
+
+            // Only consider today or future dates
+            if (diff >= 0 && diff < minDiff) {
+                minDiff = diff;
+                closestDateObj = dateObj;
+            }
+        });
+
+        // If no future date found, select the most recent past date
+        if (!closestDateObj && this.availableDates.length > 0) {
+            closestDateObj = this.availableDates.reduce((latest, current) => {
+                const [y1, m1, d1] = latest.date.split('-').map(Number);
+                const [y2, m2, d2] = current.date.split('-').map(Number);
+                const date1 = new Date(y1, m1 - 1, d1);
+                const date2 = new Date(y2, m2 - 1, d2);
+                return date2 > date1 ? current : latest;
+            });
+        }
+
+        if (closestDateObj) {
+            this.dateSelect.value = closestDateObj.date;
+            this.selectedDate = closestDateObj.date;
+            console.log('Pre-selected date:', closestDateObj.date);
+            // Trigger date selection to load audit data
+            this.onDateSelected();
+        }
     }
 
     formatDateForDisplay(dateObj) {
