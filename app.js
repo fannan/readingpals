@@ -55,8 +55,7 @@ class FeedbackRecorder {
         this.loadingSection = document.getElementById('loadingSection');
         this.audioPlayback = document.getElementById('audioPlayback');
         this.feedbackForm = document.getElementById('feedbackForm');
-        this.staffDisplay = document.getElementById('staffDisplay');
-        this.staffNames = document.getElementById('staffNames');
+        this.dateLabel = document.getElementById('dateLabel');
 
         // Photo mode elements
         this.modeSelector = document.getElementById('modeSelector');
@@ -304,18 +303,17 @@ class FeedbackRecorder {
         }
         this.onStudentSelected();
 
-        // Update staff display
+        // Update date label with staff names
         if (this.selectedDate) {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
             if (selectedDateObj && selectedDateObj.staff && selectedDateObj.staff.length > 0) {
                 const staffNamesList = selectedDateObj.staff.map(s => s.name).join(', ');
-                this.staffNames.textContent = staffNamesList;
-                this.staffDisplay.style.display = 'block';
+                this.dateLabel.textContent = `Session Date (VIP's: ${staffNamesList})`;
             } else {
-                this.staffDisplay.style.display = 'none';
+                this.dateLabel.textContent = 'Session Date';
             }
         } else {
-            this.staffDisplay.style.display = 'none';
+            this.dateLabel.textContent = 'Session Date';
         }
     }
 
