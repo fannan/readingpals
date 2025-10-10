@@ -346,6 +346,30 @@
             font-size: 0.85rem;
             margin-top: 0.5rem;
         }
+
+        /* Accuracy slider alert state */
+        #accuracyContainer.needs-attention {
+            background: #FFE5E5;
+            border: 2px solid #FF9999;
+            padding: 1rem;
+            border-radius: 8px;
+            animation: pulse-red 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% {
+                background: #FFE5E5;
+                border-color: #FF9999;
+            }
+            50% {
+                background: #FFD5D5;
+                border-color: #FF7777;
+            }
+        }
+
+        #accuracyContainer.needs-attention .form-label {
+            color: #DC3545;
+        }
     </style>
 </head>
 <body>

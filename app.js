@@ -99,6 +99,7 @@ class FeedbackRecorder {
     updateAccuracyDisplay(value) {
         this.accuracyValue.textContent = `${value}%`;
         this.updateSubmitButtonState();
+        this.updateAccuracyHighlight();
     }
 
     updateSubmitButtonState() {
@@ -111,6 +112,19 @@ class FeedbackRecorder {
         }
         if (this.submitPhotosBtn) {
             this.submitPhotosBtn.disabled = !isAccuracyValid;
+        }
+    }
+
+    updateAccuracyHighlight() {
+        const accuracyRate = parseInt(this.accuracySlider.value);
+        const hasPhotos = this.uploadedPhotos.length > 0;
+        const hasRecording = this.recordedAudioBlob !== null && this.recordedAudioBlob !== undefined;
+
+        // Highlight if user has content ready but accuracy is still 0
+        if ((hasPhotos || hasRecording) && accuracyRate === 0) {
+            this.accuracyContainer.classList.add('needs-attention');
+        } else {
+            this.accuracyContainer.classList.remove('needs-attention');
         }
     }
 
@@ -544,9 +558,11 @@ class FeedbackRecorder {
             this.photoCount.textContent = `${count} photo${count !== 1 ? 's' : ''} added`;
             this.photoActions.style.display = 'block';
             this.updateSubmitButtonState(); // Check if submit should be enabled
+            this.updateAccuracyHighlight(); // Highlight accuracy if needed
         } else {
             this.photoCount.textContent = '';
             this.photoActions.style.display = 'none';
+            this.updateAccuracyHighlight(); // Remove highlight when no photos
         }
     }
 
@@ -572,7 +588,7 @@ class FeedbackRecorder {
             return;
         }
 
-        // Show loading
+        // Show loading and hide everything else
         this.photoSection.style.display = 'none';
         this.modeSelector.style.display = 'none';
         this.accuracyContainer.style.display = 'none';
@@ -591,6 +607,7 @@ class FeedbackRecorder {
             this.studentSelect.value = '';
             this.accuracySlider.value = 0;
             this.updateAccuracyDisplay(0);
+            this.accuracyContainer.classList.remove('needs-attention'); // Remove highlight
             this.modeSelector.style.display = 'none';
             this.photoSection.style.display = 'none';
             this.accuracyContainer.style.display = 'none';
@@ -599,8 +616,8 @@ class FeedbackRecorder {
             alert('Failed to upload photos. Please try again.');
             this.loadingSection.style.display = 'none';
             this.photoSection.style.display = 'block';
-            this.modeSelector.style.display = 'block';
             this.accuracyContainer.style.display = 'block';
+            this.modeSelector.style.display = 'block';
         }
     }
 
@@ -753,6 +770,8 @@ class FeedbackRecorder {
         this.statusBar.style.width = '0%';
         this.statusBar.style.background = 'var(--accent-color)'; // Reset to orange
         this.audioChunks = [];
+        this.recordedAudioBlob = null; // Clear the blob
+        this.updateAccuracyHighlight(); // Remove highlight when clearing recording
     }
 
     handleRecordingComplete() {
@@ -787,6 +806,7 @@ class FeedbackRecorder {
         this.recordSection.style.display = 'none'; // Hide entire record section
         this.playbackSection.style.display = 'block';
         this.updateSubmitButtonState(); // Check if submit should be enabled
+        this.updateAccuracyHighlight(); // Highlight accuracy if needed
     }
 
     startTimer() {
@@ -839,6 +859,7 @@ class FeedbackRecorder {
         this.recordSection.style.display = 'none';
         this.recordingControls.style.display = 'none';
         this.playbackSection.style.display = 'none';
+        this.modeSelector.style.display = 'none';
         this.accuracyContainer.style.display = 'none';
         this.loadingSection.style.display = 'block';
 
@@ -852,6 +873,7 @@ class FeedbackRecorder {
             this.loadingSection.style.display = 'none';
             this.playbackSection.style.display = 'block';
             this.accuracyContainer.style.display = 'block';
+            this.modeSelector.style.display = 'block';
         }
     }
 
@@ -931,6 +953,7 @@ class FeedbackRecorder {
         this.studentSelect.value = '';
         this.accuracySlider.value = 0;
         this.updateAccuracyDisplay(0);
+        this.accuracyContainer.classList.remove('needs-attention'); // Remove highlight
         this.onStudentSelected();
     }
 
