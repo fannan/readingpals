@@ -521,8 +521,13 @@ class FeedbackRecorder {
             this.accuracyContainer.style.display = 'block';
             this.readingLevelContainer.style.display = 'block';
             this.modeSelector.style.display = 'block';
+
+            // Pre-populate sliders with previous values
+            this.prePopulateSliders();
+
             this.updatePreviousAccuracyDisplay(); // Update previous accuracy display
             this.updatePreviousReadingLevelDisplay(); // Update previous reading level display
+
             // Show the appropriate section based on current mode
             if (this.feedbackMode === 'audio') {
                 this.recordSection.style.display = 'block';
@@ -551,6 +556,67 @@ class FeedbackRecorder {
         } else {
             this.recordStatus.textContent = 'Select your name to start recording';
             this.recordBtn.disabled = true;
+        }
+    }
+
+    prePopulateSliders() {
+        const studentIndex = this.studentSelect ? this.studentSelect.value : null;
+        if (!studentIndex && studentIndex !== '0') {
+            // Reset to defaults if no student selected
+            this.accuracySlider.value = 0;
+            this.updateAccuracyDisplay(0);
+            this.readingLevelSlider.value = 0;
+            this.updateReadingLevelDisplay(0);
+            return;
+        }
+
+        const selectedStudent = this.currentStudentsList[studentIndex];
+        if (!selectedStudent) {
+            // Reset to defaults if student not found
+            this.accuracySlider.value = 0;
+            this.updateAccuracyDisplay(0);
+            this.readingLevelSlider.value = 0;
+            this.updateReadingLevelDisplay(0);
+            return;
+        }
+
+        // Pre-populate word accuracy if available and date is valid
+        const lastAccuracy = selectedStudent.last_word_accuracy;
+        const lastAccuracyDate = selectedStudent.last_accuracy_date;
+
+        if (lastAccuracy !== null && lastAccuracy !== undefined && lastAccuracyDate) {
+            if (this.selectedDate && lastAccuracyDate <= this.selectedDate) {
+                this.accuracySlider.value = lastAccuracy;
+                this.updateAccuracyDisplay(lastAccuracy);
+            } else {
+                // Reset if date is invalid
+                this.accuracySlider.value = 0;
+                this.updateAccuracyDisplay(0);
+            }
+        } else {
+            // Reset if no previous data
+            this.accuracySlider.value = 0;
+            this.updateAccuracyDisplay(0);
+        }
+
+        // Pre-populate reading level if available and date is valid
+        const lastLevel = selectedStudent.last_reading_level;
+        const lastLevelDate = selectedStudent.last_reading_level_date;
+
+        if (lastLevel && lastLevelDate) {
+            if (this.selectedDate && lastLevelDate <= this.selectedDate) {
+                const levelNumber = this.letterToNumber(lastLevel);
+                this.readingLevelSlider.value = levelNumber;
+                this.updateReadingLevelDisplay(levelNumber);
+            } else {
+                // Reset if date is invalid
+                this.readingLevelSlider.value = 0;
+                this.updateReadingLevelDisplay(0);
+            }
+        } else {
+            // Reset if no previous data
+            this.readingLevelSlider.value = 0;
+            this.updateReadingLevelDisplay(0);
         }
     }
 
