@@ -61,6 +61,7 @@ class FeedbackRecorder {
         this.accuracyContainer = document.getElementById('accuracyContainer');
         this.accuracySlider = document.getElementById('accuracySlider');
         this.accuracyValue = document.getElementById('accuracyValue');
+        this.previousAccuracy = document.getElementById('previousAccuracy');
 
         // Photo mode elements
         this.modeSelector = document.getElementById('modeSelector');
@@ -341,6 +342,7 @@ class FeedbackRecorder {
             this.studentSelect.parentElement.style.display = 'none';
             this.studentSelect.value = '';
         }
+        this.previousAccuracy.textContent = ''; // Clear previous accuracy when date changes
         this.onStudentSelected();
 
         // Update date label with staff names
@@ -472,6 +474,7 @@ class FeedbackRecorder {
         if (studentSelected) {
             this.accuracyContainer.style.display = 'block';
             this.modeSelector.style.display = 'block';
+            this.updatePreviousAccuracyDisplay(); // Update previous accuracy display
             // Show the appropriate section based on current mode
             if (this.feedbackMode === 'audio') {
                 this.recordSection.style.display = 'block';
@@ -486,6 +489,7 @@ class FeedbackRecorder {
             this.modeSelector.style.display = 'none';
             this.recordSection.style.display = 'none';
             this.photoSection.style.display = 'none';
+            this.previousAccuracy.textContent = ''; // Clear previous accuracy display
         }
 
         if (isReady) {
@@ -497,6 +501,36 @@ class FeedbackRecorder {
         } else {
             this.recordStatus.textContent = 'Select your name to start recording';
             this.recordBtn.disabled = true;
+        }
+    }
+
+    updatePreviousAccuracyDisplay() {
+        const studentIndex = this.studentSelect ? this.studentSelect.value : null;
+        if (!studentIndex && studentIndex !== '0') {
+            this.previousAccuracy.textContent = '';
+            return;
+        }
+
+        // Get the selected student object
+        const selectedStudent = this.currentStudentsList[studentIndex];
+        if (!selectedStudent) {
+            this.previousAccuracy.textContent = '';
+            return;
+        }
+
+        const lastAccuracy = selectedStudent.last_word_accuracy;
+        const lastDate = selectedStudent.last_accuracy_date;
+
+        // Check if previous data exists and date is valid
+        if (lastAccuracy !== null && lastAccuracy !== undefined && lastDate) {
+            // Compare dates: only show if last_accuracy_date <= selected date
+            if (this.selectedDate && lastDate <= this.selectedDate) {
+                this.previousAccuracy.textContent = `(Previous: ${lastAccuracy}% on ${lastDate})`;
+            } else {
+                this.previousAccuracy.textContent = '(No previous data for this date)';
+            }
+        } else {
+            this.previousAccuracy.textContent = '(No previous data)';
         }
     }
 
