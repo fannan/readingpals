@@ -152,7 +152,7 @@ class FeedbackRecorder {
             console.log('Volunteers loaded:', this.volunteers);
 
             this.populateDateDropdown();
-            this.populateVolunteerDropdown();
+            // Don't populate volunteers yet - wait for date selection
 
             // Check URL parameters AFTER data is loaded
             this.checkURLParameters();
