@@ -370,6 +370,59 @@
         #accuracyContainer.needs-attention .form-label {
             color: #DC3545;
         }
+
+        /* Reading level slider alert state */
+        #readingLevelContainer.needs-attention {
+            background: #FFE5E5;
+            border: 2px solid #FF9999;
+            padding: 1rem;
+            border-radius: 8px;
+            animation: pulse-red 2s ease-in-out infinite;
+        }
+
+        #readingLevelContainer.needs-attention .form-label {
+            color: #DC3545;
+        }
+
+        /* Value display circles */
+        #accuracyValue, #readingLevelValue {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-color), #0d7ab8);
+            color: white !important;
+            font-size: 1.5rem;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(10, 95, 140, 0.3);
+        }
+
+        /* Tick marks styling for reading level slider */
+        #readingLevelSlider::-webkit-slider-runnable-track {
+            background: linear-gradient(to right,
+                transparent calc(0/18 * 100% - 1px), var(--text-light) calc(0/18 * 100%), var(--text-light) calc(0/18 * 100% + 1px), transparent calc(0/18 * 100% + 1px),
+                transparent calc(1/18 * 100% - 1px), var(--text-light) calc(1/18 * 100%), var(--text-light) calc(1/18 * 100% + 1px), transparent calc(1/18 * 100% + 1px),
+                transparent calc(2/18 * 100% - 1px), var(--text-light) calc(2/18 * 100%), var(--text-light) calc(2/18 * 100% + 1px), transparent calc(2/18 * 100% + 1px),
+                transparent calc(3/18 * 100% - 1px), var(--text-light) calc(3/18 * 100%), var(--text-light) calc(3/18 * 100% + 1px), transparent calc(3/18 * 100% + 1px),
+                transparent calc(4/18 * 100% - 1px), var(--text-light) calc(4/18 * 100%), var(--text-light) calc(4/18 * 100% + 1px), transparent calc(4/18 * 100% + 1px),
+                transparent calc(5/18 * 100% - 1px), var(--text-light) calc(5/18 * 100%), var(--text-light) calc(5/18 * 100% + 1px), transparent calc(5/18 * 100% + 1px),
+                transparent calc(6/18 * 100% - 1px), var(--text-light) calc(6/18 * 100%), var(--text-light) calc(6/18 * 100% + 1px), transparent calc(6/18 * 100% + 1px),
+                transparent calc(7/18 * 100% - 1px), var(--text-light) calc(7/18 * 100%), var(--text-light) calc(7/18 * 100% + 1px), transparent calc(7/18 * 100% + 1px),
+                transparent calc(8/18 * 100% - 1px), var(--text-light) calc(8/18 * 100%), var(--text-light) calc(8/18 * 100% + 1px), transparent calc(8/18 * 100% + 1px),
+                transparent calc(9/18 * 100% - 1px), var(--text-light) calc(9/18 * 100%), var(--text-light) calc(9/18 * 100% + 1px), transparent calc(9/18 * 100% + 1px),
+                transparent calc(10/18 * 100% - 1px), var(--text-light) calc(10/18 * 100%), var(--text-light) calc(10/18 * 100% + 1px), transparent calc(10/18 * 100% + 1px),
+                transparent calc(11/18 * 100% - 1px), var(--text-light) calc(11/18 * 100%), var(--text-light) calc(11/18 * 100% + 1px), transparent calc(11/18 * 100% + 1px),
+                transparent calc(12/18 * 100% - 1px), var(--text-light) calc(12/18 * 100%), var(--text-light) calc(12/18 * 100% + 1px), transparent calc(12/18 * 100% + 1px),
+                transparent calc(13/18 * 100% - 1px), var(--text-light) calc(13/18 * 100%), var(--text-light) calc(13/18 * 100% + 1px), transparent calc(13/18 * 100% + 1px),
+                transparent calc(14/18 * 100% - 1px), var(--text-light) calc(14/18 * 100%), var(--text-light) calc(14/18 * 100% + 1px), transparent calc(14/18 * 100% + 1px),
+                transparent calc(15/18 * 100% - 1px), var(--text-light) calc(15/18 * 100%), var(--text-light) calc(15/18 * 100% + 1px), transparent calc(15/18 * 100% + 1px),
+                transparent calc(16/18 * 100% - 1px), var(--text-light) calc(16/18 * 100%), var(--text-light) calc(16/18 * 100% + 1px), transparent calc(16/18 * 100% + 1px),
+                transparent calc(17/18 * 100% - 1px), var(--text-light) calc(17/18 * 100%), var(--text-light) calc(17/18 * 100% + 1px), transparent calc(17/18 * 100% + 1px),
+                transparent calc(18/18 * 100% - 1px), var(--text-light) calc(18/18 * 100%), var(--text-light) calc(18/18 * 100% + 1px), transparent calc(18/18 * 100% + 1px)
+            );
+        }
     </style>
 </head>
 <body>
@@ -419,7 +472,7 @@
                         </label>
                         <input type="range" class="form-range" id="accuracySlider" min="0" max="100" value="0" step="1">
                         <div class="text-center mt-2">
-                            <span id="accuracyValue" style="font-size: 1.25rem; font-weight: 600; color: var(--primary-color);">0%</span>
+                            <span id="accuracyValue">0%</span>
                         </div>
                     </div>
 
@@ -429,7 +482,28 @@
                             Reading Level
                             <span id="previousReadingLevel" style="font-size: 0.75rem; color: var(--text-light); margin-left: 0.5rem; font-weight: normal; text-transform: none;"></span>
                         </label>
-                        <input type="range" class="form-range" id="readingLevelSlider" min="0" max="18" value="0" step="1">
+                        <input type="range" class="form-range" id="readingLevelSlider" min="0" max="18" value="0" step="1" list="reading-levels">
+                        <datalist id="reading-levels">
+                            <option value="0" label="A"></option>
+                            <option value="1" label="B"></option>
+                            <option value="2" label="C"></option>
+                            <option value="3" label="D"></option>
+                            <option value="4" label="E"></option>
+                            <option value="5" label="F"></option>
+                            <option value="6" label="G"></option>
+                            <option value="7" label="H"></option>
+                            <option value="8" label="I"></option>
+                            <option value="9" label="J"></option>
+                            <option value="10" label="K"></option>
+                            <option value="11" label="L"></option>
+                            <option value="12" label="M"></option>
+                            <option value="13" label="N"></option>
+                            <option value="14" label="O"></option>
+                            <option value="15" label="P"></option>
+                            <option value="16" label="Q"></option>
+                            <option value="17" label="R"></option>
+                            <option value="18" label="S"></option>
+                        </datalist>
                         <div class="d-flex justify-content-between" style="font-size: 0.75rem; color: var(--text-light); margin-top: 0.25rem;">
                             <span>A</span>
                             <span>E</span>
@@ -438,7 +512,7 @@
                             <span>S</span>
                         </div>
                         <div class="text-center mt-2">
-                            <span id="readingLevelValue" style="font-size: 1.25rem; font-weight: 600; color: var(--primary-color);">A</span>
+                            <span id="readingLevelValue">A</span>
                         </div>
                     </div>
 
