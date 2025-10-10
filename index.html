@@ -413,11 +413,13 @@
 
                     <!-- Word Accuracy Rate Slider -->
                     <div class="mb-4" id="accuracyContainer" style="display: none;">
-                        <label for="accuracySlider" class="form-label">Word Accuracy Rate</label>
+                        <label for="accuracySlider" class="form-label">
+                            Word Accuracy Rate
+                            <span id="previousAccuracy" style="font-size: 0.75rem; color: var(--text-light); margin-left: 0.5rem; font-weight: normal; text-transform: none;"></span>
+                        </label>
                         <input type="range" class="form-range" id="accuracySlider" min="0" max="100" value="0" step="1">
                         <div class="text-center mt-2">
                             <span id="accuracyValue" style="font-size: 1.25rem; font-weight: 600; color: var(--primary-color);">0%</span>
-                            <span id="previousAccuracy" style="font-size: 0.9rem; color: var(--text-light); margin-left: 0.5rem;"></span>
                         </div>
                     </div>
 
