@@ -525,13 +525,25 @@ class FeedbackRecorder {
         if (lastAccuracy !== null && lastAccuracy !== undefined && lastDate) {
             // Compare dates: only show if last_accuracy_date <= selected date
             if (this.selectedDate && lastDate <= this.selectedDate) {
-                this.previousAccuracy.textContent = `(Previous: ${lastAccuracy}% on ${lastDate})`;
+                // Format date as M/D
+                const formattedDate = this.formatDateMD(lastDate);
+                this.previousAccuracy.textContent = `(Prior: ${lastAccuracy}% on ${formattedDate})`;
             } else {
-                this.previousAccuracy.textContent = '(No previous data for this date)';
+                this.previousAccuracy.textContent = '(No prior data for this date)';
             }
         } else {
-            this.previousAccuracy.textContent = '(No previous data)';
+            this.previousAccuracy.textContent = '(No prior data)';
         }
+    }
+
+    formatDateMD(dateString) {
+        // Parse YYYY-MM-DD and return M/D format
+        if (!dateString) return '';
+        const parts = dateString.split('-');
+        if (parts.length !== 3) return dateString;
+        const month = parseInt(parts[1], 10); // Remove leading zero
+        const day = parseInt(parts[2], 10);   // Remove leading zero
+        return `${month}/${day}`;
     }
 
     switchMode(mode) {
