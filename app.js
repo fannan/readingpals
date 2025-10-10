@@ -63,6 +63,12 @@ class FeedbackRecorder {
         this.accuracyValue = document.getElementById('accuracyValue');
         this.previousAccuracy = document.getElementById('previousAccuracy');
 
+        // Reading level elements
+        this.readingLevelContainer = document.getElementById('readingLevelContainer');
+        this.readingLevelSlider = document.getElementById('readingLevelSlider');
+        this.readingLevelValue = document.getElementById('readingLevelValue');
+        this.previousReadingLevel = document.getElementById('previousReadingLevel');
+
         // Photo mode elements
         this.modeSelector = document.getElementById('modeSelector');
         this.audioModeBtn = document.getElementById('audioModeBtn');
@@ -90,6 +96,9 @@ class FeedbackRecorder {
         // Word accuracy slider
         this.accuracySlider.addEventListener('input', (e) => this.updateAccuracyDisplay(e.target.value));
 
+        // Reading level slider
+        this.readingLevelSlider.addEventListener('input', (e) => this.updateReadingLevelDisplay(e.target.value));
+
         // Photo mode events
         this.audioModeBtn.addEventListener('click', () => this.switchMode('audio'));
         this.photoModeBtn.addEventListener('click', () => this.switchMode('photo'));
@@ -103,16 +112,39 @@ class FeedbackRecorder {
         this.updateAccuracyHighlight();
     }
 
+    updateReadingLevelDisplay(value) {
+        const letter = this.numberToLetter(parseInt(value));
+        this.readingLevelValue.textContent = letter;
+        this.updateSubmitButtonState();
+        this.updateReadingLevelHighlight();
+    }
+
+    numberToLetter(num) {
+        // Convert 0-18 to A-S
+        return String.fromCharCode(65 + num); // 65 is ASCII code for 'A'
+    }
+
+    letterToNumber(letter) {
+        // Convert A-S to 0-18
+        if (!letter || letter.length !== 1) return 0;
+        return letter.toUpperCase().charCodeAt(0) - 65;
+    }
+
     updateSubmitButtonState() {
         const accuracyRate = parseInt(this.accuracySlider.value);
         const isAccuracyValid = accuracyRate > 0;
 
-        // Disable/enable submit buttons based on accuracy
+        const readingLevel = parseInt(this.readingLevelSlider.value);
+        const isReadingLevelValid = readingLevel > 0; // Must be at least B (not default A)
+
+        const isValid = isAccuracyValid && isReadingLevelValid;
+
+        // Disable/enable submit buttons based on both fields
         if (this.submitBtn) {
-            this.submitBtn.disabled = !isAccuracyValid;
+            this.submitBtn.disabled = !isValid;
         }
         if (this.submitPhotosBtn) {
-            this.submitPhotosBtn.disabled = !isAccuracyValid;
+            this.submitPhotosBtn.disabled = !isValid;
         }
     }
 
@@ -126,6 +158,19 @@ class FeedbackRecorder {
             this.accuracyContainer.classList.add('needs-attention');
         } else {
             this.accuracyContainer.classList.remove('needs-attention');
+        }
+    }
+
+    updateReadingLevelHighlight() {
+        const readingLevel = parseInt(this.readingLevelSlider.value);
+        const hasPhotos = this.uploadedPhotos.length > 0;
+        const hasRecording = this.recordedAudioBlob !== null && this.recordedAudioBlob !== undefined;
+
+        // Highlight if user has content ready but reading level is still at default (A)
+        if ((hasPhotos || hasRecording) && readingLevel === 0) {
+            this.readingLevelContainer.classList.add('needs-attention');
+        } else {
+            this.readingLevelContainer.classList.remove('needs-attention');
         }
     }
 
@@ -343,6 +388,7 @@ class FeedbackRecorder {
             this.studentSelect.value = '';
         }
         this.previousAccuracy.textContent = ''; // Clear previous accuracy when date changes
+        this.previousReadingLevel.textContent = ''; // Clear previous reading level when date changes
         this.onStudentSelected();
 
         // Update date label with staff names
@@ -470,11 +516,13 @@ class FeedbackRecorder {
         const studentSelected = this.studentSelect && this.studentSelect.value !== '';
         const isReady = volunteerSelected && studentSelected;
 
-        // Show/hide accuracy slider and mode selector based on student selection
+        // Show/hide sliders and mode selector based on student selection
         if (studentSelected) {
             this.accuracyContainer.style.display = 'block';
+            this.readingLevelContainer.style.display = 'block';
             this.modeSelector.style.display = 'block';
             this.updatePreviousAccuracyDisplay(); // Update previous accuracy display
+            this.updatePreviousReadingLevelDisplay(); // Update previous reading level display
             // Show the appropriate section based on current mode
             if (this.feedbackMode === 'audio') {
                 this.recordSection.style.display = 'block';
@@ -486,10 +534,12 @@ class FeedbackRecorder {
             }
         } else {
             this.accuracyContainer.style.display = 'none';
+            this.readingLevelContainer.style.display = 'none';
             this.modeSelector.style.display = 'none';
             this.recordSection.style.display = 'none';
             this.photoSection.style.display = 'none';
             this.previousAccuracy.textContent = ''; // Clear previous accuracy display
+            this.previousReadingLevel.textContent = ''; // Clear previous reading level display
         }
 
         if (isReady) {
@@ -544,6 +594,38 @@ class FeedbackRecorder {
         const month = parseInt(parts[1], 10); // Remove leading zero
         const day = parseInt(parts[2], 10);   // Remove leading zero
         return `${month}/${day}`;
+    }
+
+    updatePreviousReadingLevelDisplay() {
+        const studentIndex = this.studentSelect ? this.studentSelect.value : null;
+        if (!studentIndex && studentIndex !== '0') {
+            this.previousReadingLevel.textContent = '';
+            return;
+        }
+
+        // Get the selected student object
+        const selectedStudent = this.currentStudentsList[studentIndex];
+        if (!selectedStudent) {
+            this.previousReadingLevel.textContent = '';
+            return;
+        }
+
+        const lastLevel = selectedStudent.last_reading_level;
+        const lastDate = selectedStudent.last_reading_level_date;
+
+        // Check if previous data exists and date is valid
+        if (lastLevel && lastDate) {
+            // Compare dates: only show if last_reading_level_date <= selected date
+            if (this.selectedDate && lastDate <= this.selectedDate) {
+                // Format date as M/D
+                const formattedDate = this.formatDateMD(lastDate);
+                this.previousReadingLevel.textContent = `(Prior: ${lastLevel} on ${formattedDate})`;
+            } else {
+                this.previousReadingLevel.textContent = '(No prior data for this date)';
+            }
+        } else {
+            this.previousReadingLevel.textContent = '(No prior data)';
+        }
     }
 
     switchMode(mode) {
@@ -605,10 +687,12 @@ class FeedbackRecorder {
             this.photoActions.style.display = 'block';
             this.updateSubmitButtonState(); // Check if submit should be enabled
             this.updateAccuracyHighlight(); // Highlight accuracy if needed
+            this.updateReadingLevelHighlight(); // Highlight reading level if needed
         } else {
             this.photoCount.textContent = '';
             this.photoActions.style.display = 'none';
             this.updateAccuracyHighlight(); // Remove highlight when no photos
+            this.updateReadingLevelHighlight(); // Remove highlight when no photos
         }
     }
 
@@ -653,10 +737,14 @@ class FeedbackRecorder {
             this.studentSelect.value = '';
             this.accuracySlider.value = 0;
             this.updateAccuracyDisplay(0);
+            this.readingLevelSlider.value = 0;
+            this.updateReadingLevelDisplay(0);
             this.accuracyContainer.classList.remove('needs-attention'); // Remove highlight
+            this.readingLevelContainer.classList.remove('needs-attention'); // Remove highlight
             this.modeSelector.style.display = 'none';
             this.photoSection.style.display = 'none';
             this.accuracyContainer.style.display = 'none';
+            this.readingLevelContainer.style.display = 'none';
         } catch (error) {
             console.error('Upload error:', error);
             alert('Failed to upload photos. Please try again.');
@@ -699,8 +787,9 @@ class FeedbackRecorder {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
             const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
 
-            // Get word accuracy rate
+            // Get word accuracy rate and reading level
             const accuracyRate = parseInt(this.accuracySlider.value);
+            const readingLevel = this.numberToLetter(parseInt(this.readingLevelSlider.value));
 
             // Upload photos to Supabase Storage with Claude transcription
             const result = await this.storage.uploadPhotoFiles(
@@ -711,7 +800,8 @@ class FeedbackRecorder {
                 selectedStudent,
                 this.selectedVolunteer.id,
                 staff,
-                accuracyRate  // Pass word accuracy rate
+                accuracyRate,  // Pass word accuracy rate
+                readingLevel   // Pass reading level as letter (A-S)
             );
 
             console.log('Photo upload successful:', result);
@@ -958,8 +1048,9 @@ class FeedbackRecorder {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
             const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
 
-            // Get word accuracy rate
+            // Get word accuracy rate and reading level
             const accuracyRate = parseInt(this.accuracySlider.value);
+            const readingLevel = this.numberToLetter(parseInt(this.readingLevelSlider.value));
 
             // Upload to Supabase Storage with selected date, volunteer, student, and staff info
             const result = await this.storage.uploadAudioFile(
@@ -970,7 +1061,8 @@ class FeedbackRecorder {
                 selectedStudent,
                 this.selectedVolunteer.id,  // Pass volunteer ID for relations
                 staff,  // Pass staff array for the selected date
-                accuracyRate  // Pass word accuracy rate
+                accuracyRate,   // Pass word accuracy rate
+                readingLevel    // Pass reading level as letter (A-S)
             );
 
             console.log('Upload successful:', result);
@@ -999,7 +1091,10 @@ class FeedbackRecorder {
         this.studentSelect.value = '';
         this.accuracySlider.value = 0;
         this.updateAccuracyDisplay(0);
+        this.readingLevelSlider.value = 0;
+        this.updateReadingLevelDisplay(0);
         this.accuracyContainer.classList.remove('needs-attention'); // Remove highlight
+        this.readingLevelContainer.classList.remove('needs-attention'); // Remove highlight
         this.onStudentSelected();
     }
 

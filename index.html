@@ -423,6 +423,25 @@
                         </div>
                     </div>
 
+                    <!-- Reading Level Slider -->
+                    <div class="mb-4" id="readingLevelContainer" style="display: none;">
+                        <label for="readingLevelSlider" class="form-label">
+                            Reading Level
+                            <span id="previousReadingLevel" style="font-size: 0.75rem; color: var(--text-light); margin-left: 0.5rem; font-weight: normal; text-transform: none;"></span>
+                        </label>
+                        <input type="range" class="form-range" id="readingLevelSlider" min="0" max="18" value="0" step="1">
+                        <div class="d-flex justify-content-between" style="font-size: 0.75rem; color: var(--text-light); margin-top: 0.25rem;">
+                            <span>A</span>
+                            <span>E</span>
+                            <span>J</span>
+                            <span>N</span>
+                            <span>S</span>
+                        </div>
+                        <div class="text-center mt-2">
+                            <span id="readingLevelValue" style="font-size: 1.25rem; font-weight: 600; color: var(--primary-color);">A</span>
+                        </div>
+                    </div>
+
                     <!-- Mode Selector -->
                     <div class="mode-selector" id="modeSelector" style="display: none;">
                         <div class="d-flex gap-3">
