@@ -108,8 +108,66 @@ class FeedbackRecorder {
 
     updateAccuracyDisplay(value) {
         this.accuracyValue.textContent = `${value}%`;
+
+        // Update background color and shadow based on value
+        const intValue = parseInt(value);
+        const color = this.getAccuracyColor(intValue);
+        const shadowColor = this.getAccuracyShadowColor(intValue);
+        this.accuracyValue.style.background = color;
+        this.accuracyValue.style.boxShadow = `0 4px 12px ${shadowColor}`;
+
         this.updateSubmitButtonState();
         this.updateAccuracyHighlight();
+    }
+
+    getAccuracyColor(value) {
+        // Color transitions:
+        // 0-49%: Red to Orange
+        // 50-79%: Orange to Yellow to Light Green
+        // 80-100%: Light Green to Green
+
+        if (value < 50) {
+            // Red (220, 53, 69) to Orange (255, 107, 74)
+            const ratio = value / 50;
+            const r = Math.round(220 + (255 - 220) * ratio);
+            const g = Math.round(53 + (107 - 53) * ratio);
+            const b = Math.round(69 + (74 - 69) * ratio);
+            const r2 = Math.round(180 + (220 - 180) * ratio);
+            const g2 = Math.round(35 + (70 - 35) * ratio);
+            const b2 = Math.round(50 + (50 - 50) * ratio);
+            return `linear-gradient(135deg, rgb(${r}, ${g}, ${b}), rgb(${r2}, ${g2}, ${b2}))`;
+        } else if (value < 80) {
+            // Orange (255, 165, 0) to Yellow-Green (180, 200, 50)
+            const ratio = (value - 50) / 30;
+            const r = Math.round(255 - (255 - 180) * ratio);
+            const g = Math.round(165 + (200 - 165) * ratio);
+            const b = Math.round(0 + (50 - 0) * ratio);
+            const r2 = Math.round(220 - (220 - 140) * ratio);
+            const g2 = Math.round(130 + (180 - 130) * ratio);
+            const b2 = Math.round(0 + (40 - 0) * ratio);
+            return `linear-gradient(135deg, rgb(${r}, ${g}, ${b}), rgb(${r2}, ${g2}, ${b2}))`;
+        } else {
+            // Yellow-Green to Green (40, 167, 69)
+            const ratio = (value - 80) / 20;
+            const r = Math.round(180 - (180 - 40) * ratio);
+            const g = Math.round(200 - (200 - 167) * ratio);
+            const b = Math.round(50 + (69 - 50) * ratio);
+            const r2 = Math.round(140 - (140 - 30) * ratio);
+            const g2 = Math.round(180 - (180 - 140) * ratio);
+            const b2 = Math.round(40 + (55 - 40) * ratio);
+            return `linear-gradient(135deg, rgb(${r}, ${g}, ${b}), rgb(${r2}, ${g2}, ${b2}))`;
+        }
+    }
+
+    getAccuracyShadowColor(value) {
+        // Shadow color matches the theme
+        if (value < 50) {
+            return 'rgba(220, 53, 69, 0.4)'; // Red shadow
+        } else if (value < 80) {
+            return 'rgba(255, 165, 0, 0.4)'; // Orange shadow
+        } else {
+            return 'rgba(40, 167, 69, 0.4)'; // Green shadow
+        }
     }
 
     updateReadingLevelDisplay(value) {

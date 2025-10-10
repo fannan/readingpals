@@ -392,10 +392,16 @@
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            background: linear-gradient(135deg, var(--primary-color), #0d7ab8);
             color: white !important;
             font-size: 1.5rem;
             font-weight: 700;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            transition: background 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        /* Reading level keeps the blue gradient */
+        #readingLevelValue {
+            background: linear-gradient(135deg, var(--primary-color), #0d7ab8);
             box-shadow: 0 4px 12px rgba(10, 95, 140, 0.3);
         }
 
