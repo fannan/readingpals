@@ -301,17 +301,11 @@ class FeedbackAudit {
         console.log('Scheduled volunteers:', scheduledVolunteers);
 
         if (scheduledVolunteers.length === 0) {
-            console.warn('No volunteers found for this date. Checking if we should show all volunteers with feedback...');
+            console.warn('No volunteers found for this date. Showing all volunteers instead...');
 
-            // If no volunteers are scheduled but we have feedback data,
-            // show all volunteers who have any students
-            if (this.feedbackData.length > 0) {
-                console.log('Using all volunteers since we have feedback data');
-                this.buildGridFromAllVolunteers();
-                return;
-            }
-
-            this.showEmptyState('No volunteers scheduled for this date');
+            // If no volunteers are scheduled, show all volunteers who have students
+            // This allows viewing all volunteer-student pairs even without a schedule
+            this.buildGridFromAllVolunteers();
             return;
         }
 
