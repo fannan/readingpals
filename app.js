@@ -57,6 +57,11 @@ class FeedbackRecorder {
         this.feedbackForm = document.getElementById('feedbackForm');
         this.dateLabel = document.getElementById('dateLabel');
 
+        // Word accuracy elements
+        this.accuracyContainer = document.getElementById('accuracyContainer');
+        this.accuracySlider = document.getElementById('accuracySlider');
+        this.accuracyValue = document.getElementById('accuracyValue');
+
         // Photo mode elements
         this.modeSelector = document.getElementById('modeSelector');
         this.audioModeBtn = document.getElementById('audioModeBtn');
@@ -81,11 +86,32 @@ class FeedbackRecorder {
         this.reRecordBtn.addEventListener('click', () => this.resetForNewRecording());
         this.feedbackForm.addEventListener('submit', (e) => this.handleSubmit(e));
 
+        // Word accuracy slider
+        this.accuracySlider.addEventListener('input', (e) => this.updateAccuracyDisplay(e.target.value));
+
         // Photo mode events
         this.audioModeBtn.addEventListener('click', () => this.switchMode('audio'));
         this.photoModeBtn.addEventListener('click', () => this.switchMode('photo'));
         this.photoInput.addEventListener('change', (e) => this.handlePhotoUpload(e));
         this.submitPhotosBtn.addEventListener('click', () => this.submitPhotos());
+    }
+
+    updateAccuracyDisplay(value) {
+        this.accuracyValue.textContent = `${value}%`;
+        this.updateSubmitButtonState();
+    }
+
+    updateSubmitButtonState() {
+        const accuracyRate = parseInt(this.accuracySlider.value);
+        const isAccuracyValid = accuracyRate > 0;
+
+        // Disable/enable submit buttons based on accuracy
+        if (this.submitBtn) {
+            this.submitBtn.disabled = !isAccuracyValid;
+        }
+        if (this.submitPhotosBtn) {
+            this.submitPhotosBtn.disabled = !isAccuracyValid;
+        }
     }
 
     async loadAvailableDates() {
@@ -428,8 +454,9 @@ class FeedbackRecorder {
         const studentSelected = this.studentSelect && this.studentSelect.value !== '';
         const isReady = volunteerSelected && studentSelected;
 
-        // Show/hide mode selector based on student selection
+        // Show/hide accuracy slider and mode selector based on student selection
         if (studentSelected) {
+            this.accuracyContainer.style.display = 'block';
             this.modeSelector.style.display = 'block';
             // Show the appropriate section based on current mode
             if (this.feedbackMode === 'audio') {
@@ -441,6 +468,7 @@ class FeedbackRecorder {
                 this.recordSection.style.display = 'none';
             }
         } else {
+            this.accuracyContainer.style.display = 'none';
             this.modeSelector.style.display = 'none';
             this.recordSection.style.display = 'none';
             this.photoSection.style.display = 'none';
@@ -515,6 +543,7 @@ class FeedbackRecorder {
         if (count > 0) {
             this.photoCount.textContent = `${count} photo${count !== 1 ? 's' : ''} added`;
             this.photoActions.style.display = 'block';
+            this.updateSubmitButtonState(); // Check if submit should be enabled
         } else {
             this.photoCount.textContent = '';
             this.photoActions.style.display = 'none';
@@ -546,6 +575,7 @@ class FeedbackRecorder {
         // Show loading
         this.photoSection.style.display = 'none';
         this.modeSelector.style.display = 'none';
+        this.accuracyContainer.style.display = 'none';
         this.loadingSection.style.display = 'block';
 
         try {
@@ -559,14 +589,18 @@ class FeedbackRecorder {
             this.uploadedPhotos = [];
             this.renderPhotoGrid();
             this.studentSelect.value = '';
+            this.accuracySlider.value = 0;
+            this.updateAccuracyDisplay(0);
             this.modeSelector.style.display = 'none';
             this.photoSection.style.display = 'none';
+            this.accuracyContainer.style.display = 'none';
         } catch (error) {
             console.error('Upload error:', error);
             alert('Failed to upload photos. Please try again.');
             this.loadingSection.style.display = 'none';
             this.photoSection.style.display = 'block';
             this.modeSelector.style.display = 'block';
+            this.accuracyContainer.style.display = 'block';
         }
     }
 
@@ -602,6 +636,9 @@ class FeedbackRecorder {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
             const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
 
+            // Get word accuracy rate
+            const accuracyRate = parseInt(this.accuracySlider.value);
+
             // Upload photos to Supabase Storage with Claude transcription
             const result = await this.storage.uploadPhotoFiles(
                 this.uploadedPhotos,
@@ -610,7 +647,8 @@ class FeedbackRecorder {
                 this.selectedVolunteer.name,
                 selectedStudent,
                 this.selectedVolunteer.id,
-                staff
+                staff,
+                accuracyRate  // Pass word accuracy rate
             );
 
             console.log('Photo upload successful:', result);
@@ -748,6 +786,7 @@ class FeedbackRecorder {
         this.recordingControls.style.display = 'none';
         this.recordSection.style.display = 'none'; // Hide entire record section
         this.playbackSection.style.display = 'block';
+        this.updateSubmitButtonState(); // Check if submit should be enabled
     }
 
     startTimer() {
@@ -800,6 +839,7 @@ class FeedbackRecorder {
         this.recordSection.style.display = 'none';
         this.recordingControls.style.display = 'none';
         this.playbackSection.style.display = 'none';
+        this.accuracyContainer.style.display = 'none';
         this.loadingSection.style.display = 'block';
 
         try {
@@ -811,6 +851,7 @@ class FeedbackRecorder {
             // Show playback section again on error
             this.loadingSection.style.display = 'none';
             this.playbackSection.style.display = 'block';
+            this.accuracyContainer.style.display = 'block';
         }
     }
 
@@ -849,6 +890,9 @@ class FeedbackRecorder {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
             const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
 
+            // Get word accuracy rate
+            const accuracyRate = parseInt(this.accuracySlider.value);
+
             // Upload to Supabase Storage with selected date, volunteer, student, and staff info
             const result = await this.storage.uploadAudioFile(
                 this.recordedAudioBlob,
@@ -857,7 +901,8 @@ class FeedbackRecorder {
                 this.selectedVolunteer.name,
                 selectedStudent,
                 this.selectedVolunteer.id,  // Pass volunteer ID for relations
-                staff  // Pass staff array for the selected date
+                staff,  // Pass staff array for the selected date
+                accuracyRate  // Pass word accuracy rate
             );
 
             console.log('Upload successful:', result);
@@ -884,6 +929,8 @@ class FeedbackRecorder {
         // Reset to volunteer selected state (clear student selection)
         this.resetForNewRecording();
         this.studentSelect.value = '';
+        this.accuracySlider.value = 0;
+        this.updateAccuracyDisplay(0);
         this.onStudentSelected();
     }
 
