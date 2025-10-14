@@ -19,8 +19,6 @@ class FeedbackAdmin {
         this.filesList = document.getElementById('filesList');
         this.noFiles = document.getElementById('noFiles');
         this.refreshBtn = document.getElementById('refreshBtn');
-        this.totalFiles = document.getElementById('totalFiles');
-        this.uniqueVolunteers = document.getElementById('uniqueVolunteers');
         this.errorMessage = document.getElementById('errorMessage');
         this.dateSelect = document.getElementById('dateSelect');
     }
@@ -305,10 +303,11 @@ class FeedbackAdmin {
         const completedCount = this.gridData ? this.gridData.filter(p => p.hasFeedback).length : 0;
         const totalCount = this.gridData ? this.gridData.length : 0;
 
-        this.totalFiles.textContent = `${completedCount} / ${totalCount}`;
+        document.getElementById('completedCount').textContent = completedCount;
+        document.getElementById('totalCount').textContent = totalCount;
 
-        const uniqueVolunteersSet = new Set(this.gridData ? this.gridData.map(p => p.volunteerName) : []);
-        this.uniqueVolunteers.textContent = uniqueVolunteersSet.size;
+        // Show the count badge now that we have data
+        document.getElementById('pairCount').style.display = 'inline-block';
     }
 
     renderGrid() {
