@@ -1,12 +1,15 @@
 class FeedbackAdmin {
     constructor() {
-        this.storage = new JWTCloudStorage();
-        this.files = [];
-        this.filteredFiles = [];
+        this.feedbackRecords = [];
+        this.filteredRecords = [];
+        this.availableDates = [];
+        this.selectedDate = null;
+        this.notionApiUrl = 'https://tasks.sklabs.app/webhook/d62d9936-6521-4b54-b58f-cae39569b8f7';
+        this.datesApiUrl = 'https://tasks.sklabs.app/webhook/80337e94-93a5-407a-94d1-746efcbb4d3c';
 
         this.initializeElements();
         this.bindEvents();
-        this.loadFiles();
+        this.loadAvailableDates();
     }
 
     initializeElements() {
@@ -16,110 +19,262 @@ class FeedbackAdmin {
         this.filesList = document.getElementById('filesList');
         this.noFiles = document.getElementById('noFiles');
         this.refreshBtn = document.getElementById('refreshBtn');
-        this.searchInput = document.getElementById('searchInput');
         this.totalFiles = document.getElementById('totalFiles');
         this.uniqueVolunteers = document.getElementById('uniqueVolunteers');
         this.errorMessage = document.getElementById('errorMessage');
+        this.dateSelect = document.getElementById('dateSelect');
     }
 
     bindEvents() {
         this.refreshBtn.addEventListener('click', () => this.refreshFiles());
-        this.searchInput.addEventListener('input', (e) => this.filterFiles(e.target.value));
+        if (this.dateSelect) {
+            this.dateSelect.addEventListener('change', () => this.onDateSelected());
+        }
     }
 
-    async loadFiles() {
+    async loadAvailableDates() {
+        try {
+            console.log('Loading available dates from API...');
+            const response = await fetch(this.datesApiUrl);
+
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status}`);
+            }
+
+            const result = await response.json();
+            const data = Array.isArray(result) ? result[0] : result;
+
+            if (data.data && Array.isArray(data.data)) {
+                this.availableDates = data.data.map(item => ({
+                    date: item.name,
+                    day: item.day_name,
+                    staff: item.staff || []
+                }));
+            } else {
+                this.availableDates = [];
+            }
+
+            console.log('Available dates loaded:', this.availableDates);
+            this.populateDateDropdown();
+            this.selectClosestFutureDate();
+
+        } catch (error) {
+            console.error('Failed to load dates:', error);
+            this.showError('Failed to load available dates');
+        }
+    }
+
+    populateDateDropdown() {
+        if (!this.dateSelect) return;
+
+        this.dateSelect.innerHTML = '<option value="">Select a date...</option>';
+
+        if (this.availableDates.length === 0) {
+            this.dateSelect.innerHTML = '<option value="">No dates available</option>';
+            return;
+        }
+
+        this.availableDates.forEach(dateObj => {
+            const option = document.createElement('option');
+            option.value = dateObj.date;
+            option.textContent = this.formatDateForDisplay(dateObj);
+            this.dateSelect.appendChild(option);
+        });
+    }
+
+    formatDateForDisplay(dateObj) {
+        try {
+            const [year, month, day] = dateObj.date.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            const formattedDate = date.toLocaleDateString('en-US', options);
+            return `${dateObj.day}, ${formattedDate}`;
+        } catch (error) {
+            return dateObj.date;
+        }
+    }
+
+    selectClosestFutureDate() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        let closestDateObj = null;
+        let minDiff = Infinity;
+
+        this.availableDates.forEach(dateObj => {
+            const [year, month, day] = dateObj.date.split('-').map(Number);
+            const date = new Date(year, month - 1, day);
+            date.setHours(0, 0, 0, 0);
+
+            const diff = date - today;
+
+            if (diff >= 0 && diff < minDiff) {
+                minDiff = diff;
+                closestDateObj = dateObj;
+            }
+        });
+
+        if (!closestDateObj && this.availableDates.length > 0) {
+            closestDateObj = this.availableDates.reduce((latest, current) => {
+                const [y1, m1, d1] = latest.date.split('-').map(Number);
+                const [y2, m2, d2] = current.date.split('-').map(Number);
+                const date1 = new Date(y1, m1 - 1, d1);
+                const date2 = new Date(y2, m2 - 1, d2);
+                return date2 > date1 ? current : latest;
+            });
+        }
+
+        if (closestDateObj && this.dateSelect) {
+            this.dateSelect.value = closestDateObj.date;
+            this.selectedDate = closestDateObj.date;
+            console.log('Pre-selected date:', closestDateObj.date);
+            this.loadFeedback();
+        }
+    }
+
+    onDateSelected() {
+        this.selectedDate = this.dateSelect.value;
+        console.log('Date selected:', this.selectedDate);
+
+        if (this.selectedDate) {
+            this.loadFeedback();
+        }
+    }
+
+    async loadFeedback() {
+        if (!this.selectedDate) {
+            this.showError('Please select a date');
+            return;
+        }
+
         try {
             this.showLoading();
-            this.files = await this.fetchFilesFromBucket();
-            this.filteredFiles = [...this.files];
+
+            // Fetch both feedback records and scheduled pairs
+            const [feedbackRecords, scheduledPairs] = await Promise.all([
+                this.fetchFeedbackFromNotion(this.selectedDate),
+                this.fetchScheduledPairs(this.selectedDate)
+            ]);
+
+            this.feedbackRecords = feedbackRecords;
+            this.scheduledPairs = scheduledPairs;
+
+            // Create combined grid data
+            this.gridData = this.createGridData(scheduledPairs, feedbackRecords);
+
             this.updateStats();
-            this.renderFiles();
+            this.renderGrid();
             this.showFiles();
         } catch (error) {
-            console.error('Error loading files:', error);
+            console.error('Error loading feedback:', error);
             this.showError(error.message);
         }
     }
 
-    async fetchFilesFromBucket() {
+    async fetchScheduledPairs(date) {
+        // Get scheduled volunteer-student pairs from the dates API
+        const dateObj = this.availableDates.find(d => d.date === date);
+        if (!dateObj) return [];
+
+        // Need to fetch volunteer details with their students
+        const response = await fetch(this.datesApiUrl);
+        const result = await response.json();
+        const data = Array.isArray(result) ? result[0] : result;
+
+        if (!data.volunteers) return [];
+
+        // Find the selected date's scheduled volunteers
+        const selectedDateData = data.data.find(d => d.name === date);
+        if (!selectedDateData || !selectedDateData.volunteers) return [];
+
+        const scheduledVolunteerIds = selectedDateData.volunteers.map(v => v.id);
+
+        // Get full volunteer data with students for scheduled volunteers
+        const scheduledPairs = [];
+        data.volunteers.forEach(volunteer => {
+            if (scheduledVolunteerIds.includes(volunteer.id)) {
+                volunteer.students.forEach(student => {
+                    scheduledPairs.push({
+                        volunteerId: volunteer.id,
+                        volunteerName: volunteer.name,
+                        studentId: student.id,
+                        studentName: student.name
+                    });
+                });
+            }
+        });
+
+        return scheduledPairs;
+    }
+
+    createGridData(scheduledPairs, feedbackRecords) {
+        // Create a map of schedule pairs with their feedback status
+        return scheduledPairs.map(pair => {
+            // Find all feedback records for this pair
+            const feedback = feedbackRecords.filter(f =>
+                f.volunteerId === pair.volunteerId &&
+                f.studentId === pair.studentId
+            );
+
+            return {
+                ...pair,
+                hasFeedback: feedback.length > 0,
+                feedbackRecords: feedback,
+                feedbackCount: feedback.length
+            };
+        });
+    }
+
+    async fetchFeedbackFromNotion(date) {
         try {
-            // Use Google Cloud Storage JSON API to list objects
-            const listUrl = `https://storage.googleapis.com/storage/v1/b/${this.storage.bucketName}/o`;
+            console.log('Fetching feedback from API for date:', date);
 
-            console.log('Fetching files from:', listUrl);
-
-            const response = await fetch(listUrl);
+            const response = await fetch(`${this.notionApiUrl}?date=${date}`);
 
             if (!response.ok) {
-                throw new Error(`Failed to fetch files: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to fetch feedback: ${response.status} ${response.statusText}`);
             }
 
             const data = await response.json();
+            console.log('API response:', data);
 
-            if (!data.items || data.items.length === 0) {
-                return [];
-            }
+            // Handle the response format - expecting an array of feedback records
+            const records = Array.isArray(data) ? data : (data.results || []);
 
-            // Process and sort files
-            const files = data.items
-                .filter(item => item.name.endsWith('.webm') || item.name.endsWith('.mp3'))
-                .map(item => this.parseFileData(item))
-                .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+            // Transform records to match our display format
+            return records.map(record => this.parseFeedbackRecord(record));
 
-            return files;
         } catch (error) {
-            console.error('Error fetching files:', error);
-            // Return empty array if fetch fails (bucket might be empty)
-            return [];
+            console.error('Error fetching feedback:', error);
+            throw error;
         }
     }
 
-    parseFileData(item) {
-        // Parse filename: YYYY-MM-DD/volunteer-name-HH-MM-SS-timestamp.webm
-        const nameParts = item.name.split('/');
-        const fileName = nameParts[nameParts.length - 1];
-        const dateFolder = nameParts[0];
-
-        // Extract volunteer name from filename
-        const fileNameParts = fileName.split('-');
-        let volunteerName = 'Unknown';
-
-        if (fileNameParts.length >= 4) {
-            // Find where the time part starts (HH-MM-SS pattern)
-            let timeStartIndex = -1;
-            for (let i = 0; i < fileNameParts.length - 2; i++) {
-                if (this.isTimePattern(fileNameParts[i], fileNameParts[i + 1], fileNameParts[i + 2])) {
-                    timeStartIndex = i;
-                    break;
-                }
-            }
-
-            if (timeStartIndex > 0) {
-                volunteerName = fileNameParts.slice(0, timeStartIndex).join('-');
-            }
-        }
-
+    parseFeedbackRecord(record) {
+        // Parse the feedback record from your actual API response format
         return {
-            name: item.name,
-            fileName: fileName,
-            volunteerName: this.formatVolunteerName(volunteerName),
-            uploadDate: item.timeCreated,
-            size: parseInt(item.size),
-            url: `https://storage.googleapis.com/${this.storage.bucketName}/${item.name}`,
-            date: dateFolder,
-            displayDate: this.formatDate(dateFolder)
+            id: record.id,
+            volunteerName: this.extractNameFromMeetingName(record.property_meeting_name, 'volunteer'),
+            volunteerId: record.property_volunteer?.[0] || null,
+            studentName: this.extractNameFromMeetingName(record.property_meeting_name, 'student'),
+            studentId: record.property_student?.[0] || null,
+            scheduleId: record.property_schedule?.[0] || null,
+            urls: record.property_urls || [],
+            inputType: record.property_input_type || 'Audio',
+            wordAccuracy: record.property_word_accuracy || 0,
+            readingLevel: record.property_reading_level || '',
+            date: record.property_date_pretty || record.property_date?.start?.split('T')[0] || '',
+            createdAt: record.property_date?.start || new Date().toISOString(),
+            notionUrl: record.url
         };
     }
 
-    isTimePattern(part1, part2, part3) {
-        // Check if three parts look like HH-MM-SS
-        return /^\d{2}$/.test(part1) && /^\d{2}$/.test(part2) && /^\d{2}$/.test(part3);
-    }
-
-    formatVolunteerName(name) {
-        return name.split('-').map(word =>
-            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        ).join(' ');
+    extractNameFromMeetingName(meetingName, type) {
+        // Parse "Joanne Rolfe - Jack - 2025-10-20" format
+        if (!meetingName) return 'Unknown';
+        const parts = meetingName.split(' - ');
+        if (parts.length < 2) return 'Unknown';
+        return type === 'volunteer' ? parts[0].trim() : parts[1].trim();
     }
 
     formatDate(dateStr) {
@@ -136,14 +291,6 @@ class FeedbackAdmin {
         }
     }
 
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
     formatUploadTime(uploadDate) {
         const date = new Date(uploadDate);
         return date.toLocaleString('en-US', {
@@ -155,14 +302,17 @@ class FeedbackAdmin {
     }
 
     updateStats() {
-        this.totalFiles.textContent = this.files.length;
+        const completedCount = this.gridData ? this.gridData.filter(p => p.hasFeedback).length : 0;
+        const totalCount = this.gridData ? this.gridData.length : 0;
 
-        const uniqueVolunteersSet = new Set(this.files.map(f => f.volunteerName));
+        this.totalFiles.textContent = `${completedCount} / ${totalCount}`;
+
+        const uniqueVolunteersSet = new Set(this.gridData ? this.gridData.map(p => p.volunteerName) : []);
         this.uniqueVolunteers.textContent = uniqueVolunteersSet.size;
     }
 
-    renderFiles() {
-        if (this.filteredFiles.length === 0) {
+    renderGrid() {
+        if (!this.gridData || this.gridData.length === 0) {
             this.filesList.innerHTML = '';
             this.noFiles.style.display = 'block';
             return;
@@ -170,63 +320,263 @@ class FeedbackAdmin {
 
         this.noFiles.style.display = 'none';
 
-        const filesHTML = this.filteredFiles.map(file => this.createFileItem(file)).join('');
-        this.filesList.innerHTML = filesHTML;
+        const gridHTML = this.gridData.map(pair => this.createGridItem(pair)).join('');
+        this.filesList.innerHTML = gridHTML;
     }
 
-    createFileItem(file) {
+    createGridItem(pair) {
+        const cardClass = pair.hasFeedback ? 'has-feedback' : 'no-feedback';
+        const statusText = pair.hasFeedback ? '✓ Done' : 'Pending';
+
+        // Show feedback count if multiple submissions
+        const countBadge = pair.hasFeedback && pair.feedbackCount > 1
+            ? `<div class="feedback-count">${pair.feedbackCount}</div>`
+            : '';
+
+        const onClickHandler = pair.hasFeedback
+            ? `onclick="adminApp.viewFeedback('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}')"`
+            : `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}')"`
+
         return `
-            <div class="file-item p-4">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center mb-2">
-                            <i class="bi bi-mic-fill text-primary me-3 fs-4"></i>
-                            <div>
-                                <h6 class="mb-1">${file.volunteerName}</h6>
-                                <small class="text-muted">
-                                    <i class="bi bi-calendar me-1"></i>${file.displayDate}
-                                    <span class="mx-2">•</span>
-                                    <i class="bi bi-clock me-1"></i>${this.formatUploadTime(file.uploadDate)}
-                                </small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="row align-items-center">
-                            <div class="col-8">
-                                <audio controls class="audio-player">
-                                    <source src="${file.url}" type="audio/webm">
-                                    <source src="${file.url}" type="audio/mpeg">
-                                    Your browser does not support the audio element.
-                                </audio>
-                            </div>
-                            <div class="col-4 text-end">
-                                <div class="d-flex flex-column gap-2">
-                                    <span class="date-badge">${this.formatFileSize(file.size)}</span>
-                                    <a href="${file.url}" download="${file.fileName}" class="btn btn-outline-primary btn-sm">
-                                        <i class="bi bi-download"></i>
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+            <div class="file-item ${cardClass}" ${onClickHandler}>
+                ${countBadge}
+                <div>
+                    <div class="volunteer-name">${pair.volunteerName}</div>
+                    <div class="student-name">${pair.studentName}</div>
                 </div>
+                <div class="status-badge">${statusText}</div>
             </div>
         `;
     }
 
+    viewFeedback(volunteerId, studentId, volunteerName, studentName) {
+        // Find the pair and show feedback details in a modal
+        const pair = this.gridData.find(p =>
+            p.volunteerId === volunteerId && p.studentId === studentId
+        );
+
+        if (!pair || !pair.feedbackRecords) return;
+
+        // Build feedback details HTML
+        let feedbackHTML = pair.feedbackRecords.map(record => `
+            <div class="mb-3 p-3" style="background: var(--bg-light); border-radius: 8px;">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <span class="badge bg-info me-1">${record.inputType}</span>
+                        <span class="badge bg-secondary me-1">${record.wordAccuracy}%</span>
+                        ${record.readingLevel ? `<span class="badge bg-dark">${record.readingLevel}</span>` : ''}
+                    </div>
+                    <a href="${record.notionUrl}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-box-arrow-up-right"></i> View in Notion
+                    </a>
+                </div>
+                ${this.renderMedia(record)}
+            </div>
+        `).join('');
+
+        // Show in modal
+        document.getElementById('uploadModalTitle').textContent = `${volunteerName} → ${studentName}`;
+        document.getElementById('feedbackDetailsContent').innerHTML = feedbackHTML;
+        document.getElementById('feedbackDetailsModal').style.display = 'block';
+    }
+
+    closeFeedbackModal() {
+        document.getElementById('feedbackDetailsModal').style.display = 'none';
+    }
+
+    escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    openUploadModal(volunteerId, studentId, volunteerName, studentName) {
+        this.uploadModalData = {
+            volunteerId,
+            studentId,
+            volunteerName,
+            studentName
+        };
+
+        // Show modal
+        document.getElementById('uploadModal').style.display = 'block';
+        document.getElementById('uploadModalTitle').textContent = `Upload Feedback: ${volunteerName} → ${studentName}`;
+
+        // Reset form
+        document.getElementById('photoInput').value = '';
+        document.getElementById('photoPreview').innerHTML = '';
+        document.getElementById('accuracySlider').value = 0;
+        document.getElementById('accuracyValue').textContent = '0%';
+        document.getElementById('readingLevelSlider').value = 0;
+        document.getElementById('readingLevelValue').textContent = 'A';
+        document.getElementById('uploadSubmitBtn').disabled = true;
+
+        // Hide metrics section by default
+        document.getElementById('metricsSection').style.display = 'none';
+        document.getElementById('toggleMetricsBtn').innerHTML = '<i class="bi bi-sliders"></i> Add Accuracy & Reading Level (Optional)';
+    }
+
+    toggleMetrics() {
+        const metricsSection = document.getElementById('metricsSection');
+        const toggleBtn = document.getElementById('toggleMetricsBtn');
+
+        if (metricsSection.style.display === 'none') {
+            metricsSection.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Hide Accuracy & Reading Level';
+        } else {
+            metricsSection.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Add Accuracy & Reading Level (Optional)';
+        }
+    }
+
+    closeUploadModal() {
+        document.getElementById('uploadModal').style.display = 'none';
+        this.uploadModalData = null;
+        this.uploadedPhotos = [];
+    }
+
+    handlePhotoSelect(event) {
+        const files = Array.from(event.target.files);
+        this.uploadedPhotos = files.filter(f => f.type.startsWith('image/'));
+
+        // Show preview
+        const preview = document.getElementById('photoPreview');
+        preview.innerHTML = '';
+
+        this.uploadedPhotos.forEach((file, index) => {
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.className = 'img-thumbnail me-2 mb-2';
+            img.style.maxHeight = '100px';
+            preview.appendChild(img);
+        });
+
+        this.updateUploadButtonState();
+    }
+
+    updateAccuracySlider(value) {
+        document.getElementById('accuracyValue').textContent = `${value}%`;
+        this.updateUploadButtonState();
+    }
+
+    updateReadingLevelSlider(value) {
+        const letter = String.fromCharCode(65 + parseInt(value));
+        document.getElementById('readingLevelValue').textContent = letter;
+        this.updateUploadButtonState();
+    }
+
+    updateUploadButtonState() {
+        const hasPhotos = this.uploadedPhotos && this.uploadedPhotos.length > 0;
+        document.getElementById('uploadSubmitBtn').disabled = !hasPhotos;
+    }
+
+    async submitUpload() {
+        if (!this.uploadModalData || !this.uploadedPhotos || this.uploadedPhotos.length === 0) {
+            alert('Please select at least one photo');
+            return;
+        }
+
+        // Get metrics if the section is visible, otherwise use defaults
+        const metricsVisible = document.getElementById('metricsSection').style.display !== 'none';
+        const accuracy = metricsVisible ? parseInt(document.getElementById('accuracySlider').value) : 0;
+        const readingLevelIndex = metricsVisible ? parseInt(document.getElementById('readingLevelSlider').value) : 0;
+        const readingLevel = String.fromCharCode(65 + readingLevelIndex);
+
+        // Show loading
+        const submitBtn = document.getElementById('uploadSubmitBtn');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i>Uploading...';
+
+        try {
+            // Use the same upload logic as the main form
+            if (!window.SimpleSupabaseUpload) {
+                throw new Error('Upload service not available');
+            }
+
+            const storage = new SimpleSupabaseUpload();
+            const volunteerNameSlug = this.uploadModalData.volunteerName.toLowerCase().replace(/\s+/g, '-');
+
+            // Get staff for the selected date
+            const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
+            const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
+
+            // Create student object
+            const student = {
+                id: this.uploadModalData.studentId,
+                name: this.uploadModalData.studentName
+            };
+
+            await storage.uploadPhotoFiles(
+                this.uploadedPhotos,
+                volunteerNameSlug,
+                this.selectedDate,
+                this.uploadModalData.volunteerName,
+                student,
+                this.uploadModalData.volunteerId,
+                staff,
+                accuracy,
+                readingLevel
+            );
+
+            alert('Feedback uploaded successfully!');
+            this.closeUploadModal();
+
+            // Reload the data
+            await this.loadFeedback();
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Failed to upload feedback: ' + error.message);
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-upload me-2"></i>Submit Feedback';
+        }
+    }
+
+    renderMedia(record) {
+        if (!record.urls || record.urls.length === 0) return '';
+
+        if (record.inputType === 'Photo') {
+            return `
+                <div class="row g-2 mt-1">
+                    ${record.urls.map(url => `
+                        <div class="col-4 col-md-3">
+                            <img src="${url}" alt="Photo" class="img-fluid rounded" style="max-height: 120px; object-fit: cover; width: 100%; cursor: pointer;" onclick="window.open('${url}', '_blank')">
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } else {
+            return `
+                <audio controls class="audio-player mt-2" style="width: 100%;">
+                    <source src="${record.urls[0]}" type="audio/webm">
+                    <source src="${record.urls[0]}" type="audio/mpeg">
+                    Your browser does not support the audio element.
+                </audio>
+            `;
+        }
+    }
+
     filterFiles(searchTerm) {
         if (!searchTerm.trim()) {
-            this.filteredFiles = [...this.files];
+            this.filteredGridData = [...this.gridData];
         } else {
             const term = searchTerm.toLowerCase();
-            this.filteredFiles = this.files.filter(file =>
-                file.volunteerName.toLowerCase().includes(term) ||
-                file.displayDate.toLowerCase().includes(term) ||
-                file.date.includes(term)
+            this.filteredGridData = this.gridData.filter(pair =>
+                pair.volunteerName.toLowerCase().includes(term) ||
+                pair.studentName.toLowerCase().includes(term)
             );
         }
-        this.renderFiles();
+
+        // Temporarily swap gridData for filtered rendering
+        const originalData = this.gridData;
+        this.gridData = this.filteredGridData;
+        this.renderGrid();
+        this.gridData = originalData;
     }
 
     async refreshFiles() {
@@ -234,7 +584,7 @@ class FeedbackAdmin {
         this.refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise loading-spinner me-2"></i>Refreshing...';
 
         try {
-            await this.loadFiles();
+            await this.loadFeedback();
         } finally {
             this.refreshBtn.disabled = false;
             this.refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Refresh';
@@ -262,6 +612,8 @@ class FeedbackAdmin {
 }
 
 // Initialize the admin when DOM is loaded
+let adminApp;
 document.addEventListener('DOMContentLoaded', () => {
-    new FeedbackAdmin();
+    adminApp = new FeedbackAdmin();
+    window.adminApp = adminApp; // Expose globally for modal callbacks
 });
