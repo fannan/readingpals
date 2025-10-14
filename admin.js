@@ -332,12 +332,15 @@ class FeedbackAdmin {
             ? `<div class="feedback-count">${pair.feedbackCount}</div>`
             : '';
 
+        // Only make pending cards clickable
         const onClickHandler = pair.hasFeedback
-            ? `onclick="adminApp.viewFeedback('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}')"`
+            ? ''
             : `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}')"`
 
+        const cursorStyle = pair.hasFeedback ? 'cursor: default;' : '';
+
         return `
-            <div class="file-item ${cardClass}" ${onClickHandler}>
+            <div class="file-item ${cardClass}" ${onClickHandler} style="${cursorStyle}">
                 ${countBadge}
                 <div>
                     <div class="volunteer-name">${pair.volunteerName}</div>
