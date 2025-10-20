@@ -14,6 +14,8 @@ class FeedbackRecorder {
         this.selectedVolunteer = null;
         this.minimumSeconds = 30; // Default minimum recording time
         this.showAllStudents = false; // Flag to show all students or only volunteer's students
+        this.collectReadingLevel = true; // Flag to show reading level fields (from Notion schedule)
+        this.showAdvancedFields = false; // Toggle for showing advanced fields
         this.feedbackMode = 'audio'; // 'audio' or 'photo'
         this.uploadedPhotos = []; // Array to store photo files
 
@@ -69,6 +71,15 @@ class FeedbackRecorder {
         this.readingLevelValue = document.getElementById('readingLevelValue');
         this.previousReadingLevel = document.getElementById('previousReadingLevel');
 
+        // Book difficulty elements
+        this.bookDifficultyContainer = document.getElementById('bookDifficultyContainer');
+        this.difficultyPills = document.querySelectorAll('.difficulty-pill');
+        this.selectedDifficulty = null; // No default - will be set based on collect_reading_level flag
+
+        // Advanced toggle elements
+        this.advancedToggleContainer = document.getElementById('advancedToggleContainer');
+        this.advancedToggleBtn = document.getElementById('advancedToggleBtn');
+
         // Photo mode elements
         this.modeSelector = document.getElementById('modeSelector');
         this.audioModeBtn = document.getElementById('audioModeBtn');
@@ -104,17 +115,66 @@ class FeedbackRecorder {
         this.photoModeBtn.addEventListener('click', () => this.switchMode('photo'));
         this.photoInput.addEventListener('change', (e) => this.handlePhotoUpload(e));
         this.submitPhotosBtn.addEventListener('click', () => this.submitPhotos());
+
+        // Book difficulty pill events
+        this.difficultyPills.forEach(pill => {
+            pill.addEventListener('click', () => this.selectDifficulty(pill));
+        });
+
+        // Advanced toggle event
+        if (this.advancedToggleBtn) {
+            this.advancedToggleBtn.addEventListener('click', () => this.toggleAdvancedFields());
+        }
+    }
+
+    toggleAdvancedFields() {
+        this.showAdvancedFields = !this.showAdvancedFields;
+
+        if (this.showAdvancedFields) {
+            // Show advanced fields (Reading Level and Word Accuracy Rate)
+            this.readingLevelContainer.style.display = 'block';
+            this.accuracyContainer.style.display = 'block';
+            this.advancedToggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i> Hide Advanced Fields';
+        } else {
+            // Hide advanced fields (keep Book Difficulty visible)
+            this.readingLevelContainer.style.display = 'none';
+            this.accuracyContainer.style.display = 'none';
+            this.advancedToggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i> Show Advanced Fields';
+        }
+    }
+
+    selectDifficulty(selectedPill) {
+        // Remove active class from all pills
+        this.difficultyPills.forEach(pill => pill.classList.remove('active'));
+
+        // Add active class to selected pill
+        selectedPill.classList.add('active');
+
+        // Store the selected difficulty
+        this.selectedDifficulty = selectedPill.dataset.difficulty;
+
+        console.log('Book difficulty selected:', this.selectedDifficulty);
+
+        // Update submit button state after selection
+        this.updateSubmitButtonState();
     }
 
     updateAccuracyDisplay(value) {
-        this.accuracyValue.textContent = `${value}%`;
-
-        // Update background color and shadow based on value
         const intValue = parseInt(value);
-        const color = this.getAccuracyColor(intValue);
-        const shadowColor = this.getAccuracyShadowColor(intValue);
-        this.accuracyValue.style.background = color;
-        this.accuracyValue.style.boxShadow = `0 4px 12px ${shadowColor}`;
+
+        if (intValue === -1) {
+            this.accuracyValue.textContent = 'N/A';
+            this.accuracyValue.style.background = 'linear-gradient(135deg, #6C757D, #495057)';
+            this.accuracyValue.style.boxShadow = '0 3px 10px rgba(108, 117, 125, 0.25)';
+        } else {
+            this.accuracyValue.textContent = `${value}%`;
+
+            // Update background color and shadow based on value
+            const color = this.getAccuracyColor(intValue);
+            const shadowColor = this.getAccuracyShadowColor(intValue);
+            this.accuracyValue.style.background = color;
+            this.accuracyValue.style.boxShadow = `0 4px 12px ${shadowColor}`;
+        }
 
         this.updateSubmitButtonState();
         this.updateAccuracyHighlight();
@@ -171,33 +231,48 @@ class FeedbackRecorder {
     }
 
     updateReadingLevelDisplay(value) {
-        const letter = this.numberToLetter(parseInt(value));
+        const intValue = parseInt(value);
+        const letter = this.numberToLetter(intValue);
         this.readingLevelValue.textContent = letter;
         this.updateSubmitButtonState();
         this.updateReadingLevelHighlight();
     }
 
     numberToLetter(num) {
-        // Convert 0-18 to A-S
+        // Convert -1 to N/A, 0-18 to A-S
+        if (num === -1) return 'N/A';
         return String.fromCharCode(65 + num); // 65 is ASCII code for 'A'
     }
 
     letterToNumber(letter) {
-        // Convert A-S to 0-18
-        if (!letter || letter.length !== 1) return 0;
+        // Convert N/A to -1, A-S to 0-18
+        if (!letter || letter === 'N/A') return -1;
+        if (letter.length !== 1) return -1;
         return letter.toUpperCase().charCodeAt(0) - 65;
     }
 
     updateSubmitButtonState() {
-        const accuracyRate = parseInt(this.accuracySlider.value);
-        const isAccuracyValid = accuracyRate > 0;
+        let isValid = false;
 
-        const readingLevel = parseInt(this.readingLevelSlider.value);
-        const isReadingLevelValid = readingLevel > 0; // Must be at least B (not default A)
+        if (this.collectReadingLevel) {
+            // When collect_reading_level is true, all three fields are mandatory
+            const accuracyRate = parseInt(this.accuracySlider.value);
+            const isAccuracyValid = accuracyRate >= 0; // Must be selected (not N/A which is -1)
 
-        const isValid = isAccuracyValid && isReadingLevelValid;
+            const readingLevel = parseInt(this.readingLevelSlider.value);
+            const isReadingLevelValid = readingLevel >= 0; // Must be selected (not N/A which is -1)
 
-        // Disable/enable submit buttons based on both fields
+            const isBookDifficultyValid = this.selectedDifficulty !== null;
+
+            isValid = isAccuracyValid && isReadingLevelValid && isBookDifficultyValid;
+        } else {
+            // When collect_reading_level is false, only Book Difficulty is mandatory
+            // Reading Level and Word Accuracy are optional (can be N/A)
+            const isBookDifficultyValid = this.selectedDifficulty !== null;
+            isValid = isBookDifficultyValid;
+        }
+
+        // Disable/enable submit buttons based on validation
         if (this.submitBtn) {
             this.submitBtn.disabled = !isValid;
         }
@@ -211,8 +286,8 @@ class FeedbackRecorder {
         const hasPhotos = this.uploadedPhotos.length > 0;
         const hasRecording = this.recordedAudioBlob !== null && this.recordedAudioBlob !== undefined;
 
-        // Highlight if user has content ready but accuracy is still 0
-        if ((hasPhotos || hasRecording) && accuracyRate === 0) {
+        // Highlight if user has content ready but accuracy is still N/A and collect_reading_level is true
+        if (this.collectReadingLevel && (hasPhotos || hasRecording) && accuracyRate === -1) {
             this.accuracyContainer.classList.add('needs-attention');
         } else {
             this.accuracyContainer.classList.remove('needs-attention');
@@ -224,8 +299,8 @@ class FeedbackRecorder {
         const hasPhotos = this.uploadedPhotos.length > 0;
         const hasRecording = this.recordedAudioBlob !== null && this.recordedAudioBlob !== undefined;
 
-        // Highlight if user has content ready but reading level is still at default (A)
-        if ((hasPhotos || hasRecording) && readingLevel === 0) {
+        // Highlight if user has content ready but reading level is still N/A and collect_reading_level is true
+        if (this.collectReadingLevel && (hasPhotos || hasRecording) && readingLevel === -1) {
             this.readingLevelContainer.classList.add('needs-attention');
         } else {
             this.readingLevelContainer.classList.remove('needs-attention');
@@ -246,13 +321,14 @@ class FeedbackRecorder {
             // Response is wrapped in an array, get the first element
             const data = Array.isArray(result) ? result[0] : result;
 
-            // Parse the new format: { data: [ { name: "2025-10-06", staff: [...], volunteers: [...], day_name: "Monday" }, ... ], volunteers: [...] }
+            // Parse the new format: { data: [ { name: "2025-10-06", staff: [...], volunteers: [...], day_name: "Monday", collect_reading_level: true }, ... ], volunteers: [...] }
             if (data.data && Array.isArray(data.data)) {
                 this.availableDates = data.data.map(item => ({
                     date: item.name,
                     day: item.day_name,
                     staff: item.staff || [],  // VIPs/Super Volunteers
-                    volunteers: item.volunteers || []  // Scheduled volunteers for this date
+                    volunteers: item.volunteers || [],  // Scheduled volunteers for this date
+                    collect_reading_level: item.collect_reading_level !== undefined ? item.collect_reading_level : true  // Default to true if not specified
                 }));
             } else {
                 this.availableDates = [];
@@ -449,26 +525,127 @@ class FeedbackRecorder {
         this.previousReadingLevel.textContent = ''; // Clear previous reading level when date changes
         this.onStudentSelected();
 
-        // Update date label with staff names
+        // Update date label with staff names and get collect_reading_level flag
         if (this.selectedDate) {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
-            if (selectedDateObj && selectedDateObj.staff && selectedDateObj.staff.length > 0) {
-                const staffNamesList = selectedDateObj.staff.map(s => s.name).join(', ');
-                this.dateLabel.textContent = `Session Date (VIP's: ${staffNamesList})`;
+            if (selectedDateObj) {
+                // Update the collect_reading_level flag for this date
+                this.collectReadingLevel = selectedDateObj.collect_reading_level !== undefined ? selectedDateObj.collect_reading_level : true;
+                console.log('Collect reading level for this date:', this.collectReadingLevel);
+
+                // Update staff display
+                if (selectedDateObj.staff && selectedDateObj.staff.length > 0) {
+                    const staffNamesList = selectedDateObj.staff.map(s => s.name).join(', ');
+                    this.dateLabel.textContent = `Session Date (VIP's: ${staffNamesList})`;
+                } else {
+                    this.dateLabel.textContent = 'Session Date';
+                }
             } else {
                 this.dateLabel.textContent = 'Session Date';
+                this.collectReadingLevel = true; // Default to true
             }
         } else {
             this.dateLabel.textContent = 'Session Date';
+            this.collectReadingLevel = true; // Default to true
         }
     }
 
     checkURLParameters() {
         const urlParams = new URLSearchParams(window.location.search);
-
-        // Pre-select date if provided
+        const volunteerParam = urlParams.get('volunteer');
         const dateParam = urlParams.get('date');
-        if (dateParam && this.dateSelect) {
+
+        // If volunteer parameter is provided, find the next date where they're scheduled
+        if (volunteerParam) {
+            // Try to find volunteer by ID first, then by name
+            const volunteer = this.volunteers.find(v =>
+                v.id === volunteerParam ||
+                v.name.toLowerCase().replace(/\s+/g, '-') === volunteerParam.toLowerCase()
+            );
+
+            if (volunteer) {
+                // Find the next date (today or future) where this volunteer is scheduled
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                let nextDateForVolunteer = null;
+                let minDiff = Infinity;
+
+                this.availableDates.forEach(dateObj => {
+                    // Check if volunteer is scheduled for this date
+                    const isVolunteerScheduled = dateObj.volunteers &&
+                        dateObj.volunteers.some(v => v.id === volunteer.id);
+
+                    if (isVolunteerScheduled) {
+                        // Parse date as local time
+                        const [year, month, day] = dateObj.date.split('-').map(Number);
+                        const date = new Date(year, month - 1, day);
+                        date.setHours(0, 0, 0, 0);
+
+                        const diff = date - today;
+
+                        // Only consider today or future dates
+                        if (diff >= 0 && diff < minDiff) {
+                            minDiff = diff;
+                            nextDateForVolunteer = dateObj;
+                        }
+                    }
+                });
+
+                // If no future date found, try to find the most recent past date
+                if (!nextDateForVolunteer) {
+                    let mostRecentDate = null;
+                    let maxPastDate = null;
+
+                    this.availableDates.forEach(dateObj => {
+                        const isVolunteerScheduled = dateObj.volunteers &&
+                            dateObj.volunteers.some(v => v.id === volunteer.id);
+
+                        if (isVolunteerScheduled) {
+                            const [year, month, day] = dateObj.date.split('-').map(Number);
+                            const date = new Date(year, month - 1, day);
+
+                            if (!maxPastDate || date > maxPastDate) {
+                                maxPastDate = date;
+                                mostRecentDate = dateObj;
+                            }
+                        }
+                    });
+
+                    nextDateForVolunteer = mostRecentDate;
+                }
+
+                // If we found a date for this volunteer, select it
+                if (nextDateForVolunteer && this.dateSelect) {
+                    this.dateSelect.value = nextDateForVolunteer.date;
+                    this.selectedDate = nextDateForVolunteer.date;
+                    this.onDateSelected();
+
+                    // Now select the volunteer
+                    if (this.volunteerSelect) {
+                        this.volunteerSelect.value = volunteer.id;
+                        this.onVolunteerSelected();
+
+                        // Pre-select student if provided
+                        const studentParam = urlParams.get('student');
+                        if (studentParam && this.selectedVolunteer) {
+                            setTimeout(() => {
+                                const studentIndex = this.selectedVolunteer.students.findIndex(s =>
+                                    s.id === studentParam ||
+                                    s.name.toLowerCase().replace(/\s+/g, '-') === studentParam.toLowerCase()
+                                );
+                                if (studentIndex !== -1 && this.studentSelect) {
+                                    this.studentSelect.value = studentIndex;
+                                    this.onStudentSelected();
+                                }
+                            }, 100); // Small delay to ensure dropdown is populated
+                        }
+                    }
+                }
+            }
+        }
+        // If only date parameter is provided (no volunteer), use that
+        else if (dateParam && this.dateSelect) {
             const dateOption = Array.from(this.dateSelect.options).find(opt =>
                 opt.value === dateParam
             );
@@ -476,36 +653,6 @@ class FeedbackRecorder {
                 this.dateSelect.value = dateParam;
                 this.selectedDate = dateParam;
                 this.onDateSelected();
-            }
-        }
-
-        // Pre-select volunteer if provided
-        const volunteerParam = urlParams.get('volunteer');
-        if (volunteerParam) {
-            // Try to find by ID first, then by name
-            const volunteer = this.volunteers.find(v =>
-                v.id === volunteerParam ||
-                v.name.toLowerCase().replace(/\s+/g, '-') === volunteerParam.toLowerCase()
-            );
-
-            if (volunteer && this.volunteerSelect) {
-                this.volunteerSelect.value = volunteer.id;
-                this.onVolunteerSelected();
-
-                // Pre-select student if provided
-                const studentParam = urlParams.get('student');
-                if (studentParam && this.selectedVolunteer) {
-                    setTimeout(() => {
-                        const studentIndex = this.selectedVolunteer.students.findIndex(s =>
-                            s.id === studentParam ||
-                            s.name.toLowerCase().replace(/\s+/g, '-') === studentParam.toLowerCase()
-                        );
-                        if (studentIndex !== -1 && this.studentSelect) {
-                            this.studentSelect.value = studentIndex;
-                            this.onStudentSelected();
-                        }
-                    }, 100); // Small delay to ensure dropdown is populated
-                }
             }
         }
     }
@@ -567,6 +714,12 @@ class FeedbackRecorder {
         });
 
         console.log('Student dropdown populated with', students.length, 'students');
+
+        // Auto-select if only one student
+        if (students.length === 1) {
+            this.studentSelect.value = 0; // Select the first (and only) student
+            this.onStudentSelected();
+        }
     }
 
     onStudentSelected() {
@@ -576,9 +729,40 @@ class FeedbackRecorder {
 
         // Show/hide sliders and mode selector based on student selection
         if (studentSelected) {
-            this.accuracyContainer.style.display = 'block';
-            this.readingLevelContainer.style.display = 'block';
             this.modeSelector.style.display = 'block';
+
+            // Reset and configure Book Difficulty based on collect_reading_level flag
+            this.difficultyPills.forEach(pill => pill.classList.remove('active'));
+
+            if (this.collectReadingLevel) {
+                // If collect_reading_level is true:
+                // - Show all fields by default
+                // - Pre-select "Just Right" for Book Difficulty
+                // - All fields are mandatory
+                this.selectedDifficulty = 'just-right';
+                this.difficultyPills.forEach(pill => {
+                    if (pill.dataset.difficulty === 'just-right') {
+                        pill.classList.add('active');
+                    }
+                });
+
+                this.bookDifficultyContainer.style.display = 'block';
+                this.readingLevelContainer.style.display = 'block';
+                this.accuracyContainer.style.display = 'block';
+                this.advancedToggleContainer.style.display = 'none'; // Hide toggle button
+                this.showAdvancedFields = true; // Mark as shown
+            } else {
+                // If collect_reading_level is false:
+                // - Always show Book Difficulty (no pre-selection, mandatory)
+                // - Show toggle button
+                // - Show/hide Reading Level and Word Accuracy based on toggle state (optional)
+                this.selectedDifficulty = null; // No pre-selection
+
+                this.bookDifficultyContainer.style.display = 'block';
+                this.advancedToggleContainer.style.display = 'block';
+                this.readingLevelContainer.style.display = this.showAdvancedFields ? 'block' : 'none';
+                this.accuracyContainer.style.display = this.showAdvancedFields ? 'block' : 'none';
+            }
 
             // Pre-populate sliders with previous values
             this.prePopulateSliders();
@@ -596,6 +780,8 @@ class FeedbackRecorder {
                 this.recordSection.style.display = 'none';
             }
         } else {
+            this.advancedToggleContainer.style.display = 'none';
+            this.bookDifficultyContainer.style.display = 'none';
             this.accuracyContainer.style.display = 'none';
             this.readingLevelContainer.style.display = 'none';
             this.modeSelector.style.display = 'none';
@@ -620,21 +806,21 @@ class FeedbackRecorder {
     prePopulateSliders() {
         const studentIndex = this.studentSelect ? this.studentSelect.value : null;
         if (!studentIndex && studentIndex !== '0') {
-            // Reset to defaults if no student selected
-            this.accuracySlider.value = 0;
-            this.updateAccuracyDisplay(0);
-            this.readingLevelSlider.value = 0;
-            this.updateReadingLevelDisplay(0);
+            // Reset to N/A if no student selected
+            this.accuracySlider.value = -1;
+            this.updateAccuracyDisplay(-1);
+            this.readingLevelSlider.value = -1;
+            this.updateReadingLevelDisplay(-1);
             return;
         }
 
         const selectedStudent = this.currentStudentsList[studentIndex];
         if (!selectedStudent) {
-            // Reset to defaults if student not found
-            this.accuracySlider.value = 0;
-            this.updateAccuracyDisplay(0);
-            this.readingLevelSlider.value = 0;
-            this.updateReadingLevelDisplay(0);
+            // Reset to N/A if student not found
+            this.accuracySlider.value = -1;
+            this.updateAccuracyDisplay(-1);
+            this.readingLevelSlider.value = -1;
+            this.updateReadingLevelDisplay(-1);
             return;
         }
 
@@ -644,17 +830,18 @@ class FeedbackRecorder {
 
         if (lastAccuracy !== null && lastAccuracy !== undefined && lastAccuracyDate) {
             if (this.selectedDate && lastAccuracyDate <= this.selectedDate) {
+                // Only populate if we have valid previous data
                 this.accuracySlider.value = lastAccuracy;
                 this.updateAccuracyDisplay(lastAccuracy);
             } else {
-                // Reset if date is invalid
-                this.accuracySlider.value = 0;
-                this.updateAccuracyDisplay(0);
+                // No valid previous data - always default to N/A
+                this.accuracySlider.value = -1;
+                this.updateAccuracyDisplay(-1);
             }
         } else {
-            // Reset if no previous data
-            this.accuracySlider.value = 0;
-            this.updateAccuracyDisplay(0);
+            // No previous data - always default to N/A
+            this.accuracySlider.value = -1;
+            this.updateAccuracyDisplay(-1);
         }
 
         // Pre-populate reading level if available and date is valid
@@ -663,18 +850,19 @@ class FeedbackRecorder {
 
         if (lastLevel && lastLevelDate) {
             if (this.selectedDate && lastLevelDate <= this.selectedDate) {
+                // Only populate if we have valid previous data
                 const levelNumber = this.letterToNumber(lastLevel);
                 this.readingLevelSlider.value = levelNumber;
                 this.updateReadingLevelDisplay(levelNumber);
             } else {
-                // Reset if date is invalid
-                this.readingLevelSlider.value = 0;
-                this.updateReadingLevelDisplay(0);
+                // No valid previous data - always default to N/A
+                this.readingLevelSlider.value = -1;
+                this.updateReadingLevelDisplay(-1);
             }
         } else {
-            // Reset if no previous data
-            this.readingLevelSlider.value = 0;
-            this.updateReadingLevelDisplay(0);
+            // No previous data - always default to N/A
+            this.readingLevelSlider.value = -1;
+            this.updateReadingLevelDisplay(-1);
         }
     }
 
@@ -859,16 +1047,23 @@ class FeedbackRecorder {
             this.uploadedPhotos = [];
             this.renderPhotoGrid();
             this.studentSelect.value = '';
-            this.accuracySlider.value = 0;
-            this.updateAccuracyDisplay(0);
-            this.readingLevelSlider.value = 0;
-            this.updateReadingLevelDisplay(0);
+            this.accuracySlider.value = -1;
+            this.updateAccuracyDisplay(-1);
+            this.readingLevelSlider.value = -1;
+            this.updateReadingLevelDisplay(-1);
             this.accuracyContainer.classList.remove('needs-attention'); // Remove highlight
             this.readingLevelContainer.classList.remove('needs-attention'); // Remove highlight
-            this.modeSelector.style.display = 'none';
-            this.photoSection.style.display = 'none';
-            this.accuracyContainer.style.display = 'none';
-            this.readingLevelContainer.style.display = 'none';
+
+            // Re-trigger student selection which will auto-select if only one student
+            if (this.currentStudentsList && this.currentStudentsList.length === 1) {
+                this.studentSelect.value = 0;
+                this.onStudentSelected();
+            } else {
+                this.modeSelector.style.display = 'none';
+                this.photoSection.style.display = 'none';
+                this.accuracyContainer.style.display = 'none';
+                this.readingLevelContainer.style.display = 'none';
+            }
         } catch (error) {
             console.error('Upload error:', error);
             alert('Failed to upload photos. Please try again.');
@@ -911,9 +1106,14 @@ class FeedbackRecorder {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
             const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
 
-            // Get word accuracy rate and reading level
-            const accuracyRate = parseInt(this.accuracySlider.value);
-            const readingLevel = this.numberToLetter(parseInt(this.readingLevelSlider.value));
+            // Get word accuracy rate, reading level, and book difficulty
+            const accuracyRateValue = parseInt(this.accuracySlider.value);
+            const accuracyRate = accuracyRateValue === -1 ? 'N/A' : accuracyRateValue;
+
+            const readingLevelValue = parseInt(this.readingLevelSlider.value);
+            const readingLevel = readingLevelValue === -1 ? 'N/A' : this.numberToLetter(readingLevelValue);
+
+            const bookDifficulty = this.selectedDifficulty;
 
             // Upload photos to Supabase Storage with Claude transcription
             const result = await this.storage.uploadPhotoFiles(
@@ -924,8 +1124,9 @@ class FeedbackRecorder {
                 selectedStudent,
                 this.selectedVolunteer.id,
                 staff,
-                accuracyRate,  // Pass word accuracy rate
-                readingLevel   // Pass reading level as letter (A-S)
+                accuracyRate,  // Pass word accuracy rate or 'N/A'
+                readingLevel,  // Pass reading level as letter (A-S) or 'N/A'
+                bookDifficulty // Pass book difficulty (too-easy, just-right, too-hard)
             );
 
             console.log('Photo upload successful:', result);
@@ -1172,9 +1373,14 @@ class FeedbackRecorder {
             const selectedDateObj = this.availableDates.find(d => d.date === this.selectedDate);
             const staff = selectedDateObj && selectedDateObj.staff ? selectedDateObj.staff : [];
 
-            // Get word accuracy rate and reading level
-            const accuracyRate = parseInt(this.accuracySlider.value);
-            const readingLevel = this.numberToLetter(parseInt(this.readingLevelSlider.value));
+            // Get word accuracy rate, reading level, and book difficulty
+            const accuracyRateValue = parseInt(this.accuracySlider.value);
+            const accuracyRate = accuracyRateValue === -1 ? 'N/A' : accuracyRateValue;
+
+            const readingLevelValue = parseInt(this.readingLevelSlider.value);
+            const readingLevel = readingLevelValue === -1 ? 'N/A' : this.numberToLetter(readingLevelValue);
+
+            const bookDifficulty = this.selectedDifficulty;
 
             // Upload to Supabase Storage with selected date, volunteer, student, and staff info
             const result = await this.storage.uploadAudioFile(
@@ -1185,8 +1391,9 @@ class FeedbackRecorder {
                 selectedStudent,
                 this.selectedVolunteer.id,  // Pass volunteer ID for relations
                 staff,  // Pass staff array for the selected date
-                accuracyRate,   // Pass word accuracy rate
-                readingLevel    // Pass reading level as letter (A-S)
+                accuracyRate,   // Pass word accuracy rate or 'N/A'
+                readingLevel,   // Pass reading level as letter (A-S) or 'N/A'
+                bookDifficulty  // Pass book difficulty (too-easy, just-right, too-hard)
             );
 
             console.log('Upload successful:', result);
@@ -1213,13 +1420,20 @@ class FeedbackRecorder {
         // Reset to volunteer selected state (clear student selection)
         this.resetForNewRecording();
         this.studentSelect.value = '';
-        this.accuracySlider.value = 0;
-        this.updateAccuracyDisplay(0);
-        this.readingLevelSlider.value = 0;
-        this.updateReadingLevelDisplay(0);
+        this.accuracySlider.value = -1;
+        this.updateAccuracyDisplay(-1);
+        this.readingLevelSlider.value = -1;
+        this.updateReadingLevelDisplay(-1);
         this.accuracyContainer.classList.remove('needs-attention'); // Remove highlight
         this.readingLevelContainer.classList.remove('needs-attention'); // Remove highlight
-        this.onStudentSelected();
+
+        // Re-trigger student selection which will auto-select if only one student
+        if (this.currentStudentsList && this.currentStudentsList.length === 1) {
+            this.studentSelect.value = 0;
+            this.onStudentSelected();
+        } else {
+            this.onStudentSelected();
+        }
     }
 
     showAlert(message, type) {

@@ -89,7 +89,8 @@ class FeedbackAudit {
                     date: item.name,
                     day: item.day_name,
                     staff: item.staff || [],
-                    volunteers: item.volunteers || []
+                    volunteers: item.volunteers || [],
+                    collect_reading_level: item.collect_reading_level !== undefined ? item.collect_reading_level : true
                 }));
             }
 

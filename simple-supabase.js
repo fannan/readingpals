@@ -9,7 +9,7 @@ class SimpleSupabaseUpload {
         this.claudeVisionWorkerUrl = 'https://reading-pals-vision.sean-b08.workers.dev';
     }
 
-    async uploadAudioFile(audioBlob, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = [], accuracyRate = 0, readingLevel = 'A') {
+    async uploadAudioFile(audioBlob, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right') {
         try {
             const fileName = this.generateFileName(volunteerName);
             console.log('Direct upload to:', fileName);
@@ -37,7 +37,7 @@ class SimpleSupabaseUpload {
                 // If it's RLS error, try with service key
                 if (errorText.includes('row-level security')) {
                     console.log('Trying with service key...');
-                    return await this.uploadWithServiceKey(audioBlob, fileName, sessionDate, volunteerDisplayName, student, volunteerId, staff, accuracyRate, readingLevel);
+                    return await this.uploadWithServiceKey(audioBlob, fileName, sessionDate, volunteerDisplayName, student, volunteerId, staff, accuracyRate, readingLevel, bookDifficulty);
                 }
 
                 throw new Error(`Upload failed: ${response.status} - ${errorText}`);
@@ -72,7 +72,8 @@ class SimpleSupabaseUpload {
                         student,
                         staff,
                         accuracyRate,
-                        readingLevel
+                        readingLevel,
+                        bookDifficulty
                     );
                     console.log('Webhook sent successfully:', webhookResult);
                     uploadResult.webhookSent = true;
@@ -91,7 +92,7 @@ class SimpleSupabaseUpload {
         }
     }
 
-    async uploadWithServiceKey(audioBlob, fileName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = [], accuracyRate = 0, readingLevel = 'A') {
+    async uploadWithServiceKey(audioBlob, fileName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right') {
         const serviceKey = 'sb_secret_IZ0xyxIUyILyGv0fA5DiVA_dUDAXsSo';
         const uploadUrl = `${this.url}/storage/v1/object/${this.bucketName}/${fileName}`;
 
@@ -137,7 +138,8 @@ class SimpleSupabaseUpload {
                     student,
                     staff,
                     accuracyRate,
-                    readingLevel
+                    readingLevel,
+                    bookDifficulty
                 );
                 console.log('Webhook sent successfully:', webhookResult);
                 uploadResult.webhookSent = true;
@@ -294,7 +296,7 @@ class SimpleSupabaseUpload {
         }
     }
 
-    async sendToWebhook(volunteerId, volunteerName, audioFileUrl, transcription, fileName, fileSize = 0, sessionDate = null, student = null, staff = [], accuracyRate = 0, readingLevel = 'A') {
+    async sendToWebhook(volunteerId, volunteerName, audioFileUrl, transcription, fileName, fileSize = 0, sessionDate = null, student = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right') {
         try {
             console.log('Sending data to webhook...');
 
@@ -324,6 +326,7 @@ class SimpleSupabaseUpload {
                 input_type: 'Audio',
                 word_accuracy_rate: accuracyRate,
                 reading_level: readingLevel,
+                book_difficulty: bookDifficulty,
                 date: submissionDate
             };
 
@@ -352,7 +355,7 @@ class SimpleSupabaseUpload {
         }
     }
 
-    async uploadPhotoFiles(photoBlobs, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = [], accuracyRate = 0, readingLevel = 'A') {
+    async uploadPhotoFiles(photoBlobs, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right') {
         try {
             console.log('Uploading', photoBlobs.length, 'photos to Supabase...');
 
@@ -419,7 +422,8 @@ class SimpleSupabaseUpload {
                     student,
                     staff,
                     accuracyRate,
-                    readingLevel
+                    readingLevel,
+                    bookDifficulty
                 );
                 console.log('Webhook sent successfully:', webhookResult);
             } catch (webhookError) {
@@ -495,7 +499,7 @@ class SimpleSupabaseUpload {
         });
     }
 
-    async sendPhotosToWebhook(volunteerId, volunteerName, photoUrls, transcription, totalFileSize = 0, sessionDate = null, student = null, staff = [], accuracyRate = 0, readingLevel = 'A') {
+    async sendPhotosToWebhook(volunteerId, volunteerName, photoUrls, transcription, totalFileSize = 0, sessionDate = null, student = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right') {
         try {
             console.log('Sending photo data to webhook...');
 
@@ -523,6 +527,7 @@ class SimpleSupabaseUpload {
                 input_type: 'Photo',
                 word_accuracy_rate: accuracyRate,
                 reading_level: readingLevel,
+                book_difficulty: bookDifficulty,
                 date: submissionDate
             };
 
