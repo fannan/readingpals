@@ -142,12 +142,21 @@
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
         }
 
+        .file-item.is-absent:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
         .file-item.has-feedback {
             background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
         }
 
         .file-item.no-feedback {
             background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        }
+
+        .file-item.is-absent {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
         }
 
         .file-item .volunteer-name {
@@ -182,6 +191,11 @@
         .file-item.no-feedback .status-badge {
             background: #dc3545;
             color: white;
+        }
+
+        .file-item.is-absent .status-badge {
+            background: #ffc107;
+            color: #333;
         }
 
         .file-item .upload-btn {

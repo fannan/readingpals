@@ -7,6 +7,10 @@ class FeedbackAdmin {
         this.notionApiUrl = 'https://tasks.sklabs.app/webhook/d62d9936-6521-4b54-b58f-cae39569b8f7';
         this.datesApiUrl = 'https://tasks.sklabs.app/webhook/80337e94-93a5-407a-94d1-746efcbb4d3c';
 
+        // Track optimistic absent state changes
+        // Key format: "volunteerId-studentId-date"
+        this.optimisticAbsentChanges = new Map();
+
         this.initializeElements();
         this.bindEvents();
         this.loadAvailableDates();
@@ -150,16 +154,18 @@ class FeedbackAdmin {
             this.showLoading();
 
             // Fetch both feedback records and scheduled pairs
-            const [feedbackRecords, scheduledPairs] = await Promise.all([
+            const [feedbackRecords, scheduledPairs, absentList] = await Promise.all([
                 this.fetchFeedbackFromNotion(this.selectedDate),
-                this.fetchScheduledPairs(this.selectedDate)
+                this.fetchScheduledPairs(this.selectedDate),
+                this.fetchAbsentList(this.selectedDate)
             ]);
 
             this.feedbackRecords = feedbackRecords;
             this.scheduledPairs = scheduledPairs;
+            this.absentList = absentList;
 
             // Create combined grid data
-            this.gridData = this.createGridData(scheduledPairs, feedbackRecords);
+            this.gridData = this.createGridData(scheduledPairs, feedbackRecords, absentList);
 
             this.updateStats();
             this.renderGrid();
@@ -186,17 +192,16 @@ class FeedbackAdmin {
         const selectedDateData = data.data.find(d => d.name === date);
         if (!selectedDateData || !selectedDateData.volunteers) return [];
 
-        // Create a map of volunteer IDs to their schedule IDs for this date
-        const volunteerScheduleMap = new Map();
-        selectedDateData.volunteers.forEach(v => {
-            volunteerScheduleMap.set(v.id, v.schedule_id);
-        });
+        // Get the schedule_id for this date
+        const scheduleId = selectedDateData.schedule_id;
+
+        // Create a set of volunteer IDs scheduled for this date
+        const scheduledVolunteerIds = selectedDateData.volunteers.map(v => v.id);
 
         // Get full volunteer data with students for scheduled volunteers
         const scheduledPairs = [];
         data.volunteers.forEach(volunteer => {
-            const scheduleId = volunteerScheduleMap.get(volunteer.id);
-            if (scheduleId) {
+            if (scheduledVolunteerIds.includes(volunteer.id)) {
                 volunteer.students.forEach(student => {
                     scheduledPairs.push({
                         volunteerId: volunteer.id,
@@ -212,7 +217,25 @@ class FeedbackAdmin {
         return scheduledPairs;
     }
 
-    createGridData(scheduledPairs, feedbackRecords) {
+    async fetchAbsentList(date) {
+        try {
+            const response = await fetch(this.datesApiUrl);
+            const result = await response.json();
+            const data = Array.isArray(result) ? result[0] : result;
+
+            // Filter absent records for the selected date
+            if (data.absent && Array.isArray(data.absent)) {
+                return data.absent.filter(a => a.date === date);
+            }
+
+            return [];
+        } catch (error) {
+            console.error('Error fetching absent list:', error);
+            return [];
+        }
+    }
+
+    createGridData(scheduledPairs, feedbackRecords, absentList) {
         // Create a map of schedule pairs with their feedback status
         return scheduledPairs.map(pair => {
             // Find all feedback records for this pair
@@ -221,11 +244,32 @@ class FeedbackAdmin {
                 f.studentId === pair.studentId
             );
 
+            // Check if this pair is marked as absent in the API data
+            const isAbsentInAPI = absentList.some(a =>
+                a.volunteer_id === pair.volunteerId &&
+                a.student_id === pair.studentId
+            );
+
+            // Check for optimistic updates
+            const optimisticKey = `${pair.volunteerId}-${pair.studentId}-${this.selectedDate}`;
+            const optimisticChange = this.optimisticAbsentChanges.get(optimisticKey);
+
+            // Determine final absent state
+            let isAbsent;
+            if (optimisticChange !== undefined) {
+                // Use optimistic state if available
+                isAbsent = optimisticChange;
+            } else {
+                // Otherwise use API data
+                isAbsent = isAbsentInAPI;
+            }
+
             return {
                 ...pair,
                 hasFeedback: feedback.length > 0,
                 feedbackRecords: feedback,
-                feedbackCount: feedback.length
+                feedbackCount: feedback.length,
+                isAbsent: isAbsent
             };
         });
     }
@@ -331,20 +375,33 @@ class FeedbackAdmin {
     }
 
     createGridItem(pair) {
-        const cardClass = pair.hasFeedback ? 'has-feedback' : 'no-feedback';
-        const statusText = pair.hasFeedback ? '✓ Done' : 'Pending';
+        // Determine card class and status based on state
+        let cardClass, statusText, onClickHandler, cursorStyle;
+
+        if (pair.hasFeedback) {
+            // Has feedback - not clickable
+            cardClass = 'has-feedback';
+            statusText = '✓ Done';
+            onClickHandler = '';
+            cursorStyle = 'cursor: default;';
+        } else if (pair.isAbsent) {
+            // Absent - still clickable to unmark
+            cardClass = 'is-absent';
+            statusText = 'Absent';
+            onClickHandler = `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}', ${pair.isAbsent})"`;
+            cursorStyle = '';
+        } else {
+            // Pending - clickable
+            cardClass = 'no-feedback';
+            statusText = 'Pending';
+            onClickHandler = `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}', ${pair.isAbsent})"`;
+            cursorStyle = '';
+        }
 
         // Show feedback count if multiple submissions
         const countBadge = pair.hasFeedback && pair.feedbackCount > 1
             ? `<div class="feedback-count">${pair.feedbackCount}</div>`
             : '';
-
-        // Only make pending cards clickable
-        const onClickHandler = pair.hasFeedback
-            ? ''
-            : `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}')"`
-
-        const cursorStyle = pair.hasFeedback ? 'cursor: default;' : '';
 
         return `
             <div class="file-item ${cardClass}" ${onClickHandler} style="${cursorStyle}">
@@ -404,13 +461,14 @@ class FeedbackAdmin {
         return text.replace(/[&<>"']/g, m => map[m]);
     }
 
-    openUploadModal(volunteerId, studentId, volunteerName, studentName, scheduleId) {
+    openUploadModal(volunteerId, studentId, volunteerName, studentName, scheduleId, isAbsent = false) {
         this.uploadModalData = {
             volunteerId,
             studentId,
             volunteerName,
             studentName,
-            scheduleId
+            scheduleId,
+            isAbsent
         };
 
         // Show modal
@@ -429,6 +487,16 @@ class FeedbackAdmin {
         // Hide metrics section by default
         document.getElementById('metricsSection').style.display = 'none';
         document.getElementById('toggleMetricsBtn').innerHTML = '<i class="bi bi-sliders"></i> Add Accuracy & Reading Level (Optional)';
+
+        // Update absent button text based on current state
+        const absentBtn = document.getElementById('markAbsentBtn');
+        if (isAbsent) {
+            absentBtn.innerHTML = '<i class="bi bi-person-check"></i> Unmark as Absent';
+            absentBtn.className = 'btn btn-info w-100 mb-3';
+        } else {
+            absentBtn.innerHTML = '<i class="bi bi-person-x"></i> Mark Student as Absent';
+            absentBtn.className = 'btn btn-warning w-100 mb-3';
+        }
     }
 
     toggleMetrics() {
@@ -552,20 +620,32 @@ class FeedbackAdmin {
             return;
         }
 
-        const { volunteerId, studentId, volunteerName, studentName, scheduleId } = this.uploadModalData;
+        const { volunteerId, studentId, volunteerName, studentName, scheduleId, isAbsent } = this.uploadModalData;
 
         // Confirm with user
-        if (!confirm(`Mark ${studentName} as absent for ${this.selectedDate}?\n\nThis will update the record in Notion.`)) {
+        const action = isAbsent ? 'Unmark' : 'Mark';
+        const confirmMessage = isAbsent
+            ? `Unmark ${studentName} as absent for ${this.selectedDate}?\n\nThis will update the record in Notion.`
+            : `Mark ${studentName} as absent for ${this.selectedDate}?\n\nThis will update the record in Notion.`;
+
+        if (!confirm(confirmMessage)) {
             return;
         }
 
         // Disable button and show loading
         const absentBtn = document.getElementById('markAbsentBtn');
         absentBtn.disabled = true;
-        absentBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Marking as Absent...';
+        const loadingText = isAbsent ? 'Unmarking...' : 'Marking as Absent...';
+        absentBtn.innerHTML = `<i class="bi bi-hourglass-split"></i> ${loadingText}`;
+
+        // Create optimistic update key
+        const optimisticKey = `${volunteerId}-${studentId}-${this.selectedDate}`;
 
         try {
-            // Call n8n webhook to mark student absent
+            // Optimistically update the UI immediately
+            this.optimisticAbsentChanges.set(optimisticKey, !isAbsent);
+
+            // Call n8n webhook to mark/unmark student absent
             const response = await fetch('https://tasks.sklabs.app/webhook/mark-absent', {
                 method: 'POST',
                 headers: {
@@ -577,28 +657,45 @@ class FeedbackAdmin {
                     student_id: studentId,
                     student_name: studentName,
                     date: this.selectedDate,
-                    schedule_id: scheduleId
+                    schedule_id: scheduleId,
+                    unmark: isAbsent  // Add flag to indicate if we're unmarking
                 })
             });
 
             if (!response.ok) {
+                // Revert optimistic update on error
+                this.optimisticAbsentChanges.delete(optimisticKey);
                 throw new Error(`API returned ${response.status}`);
             }
 
             // Success!
-            alert(`${studentName} marked as absent for ${this.selectedDate}`);
+            const successMessage = isAbsent
+                ? `${studentName} unmarked as absent for ${this.selectedDate}`
+                : `${studentName} marked as absent for ${this.selectedDate}`;
+            alert(successMessage);
             this.closeUploadModal();
 
-            // Reload the data
-            await this.loadFeedback();
+            // Refresh the grid with optimistic state
+            this.gridData = this.createGridData(this.scheduledPairs, this.feedbackRecords, this.absentList);
+            this.updateStats();
+            this.renderGrid();
+
+            // Schedule cleanup of optimistic update after 30 seconds
+            setTimeout(() => {
+                this.optimisticAbsentChanges.delete(optimisticKey);
+            }, 30000);
 
         } catch (error) {
-            console.error('Mark absent error:', error);
-            alert('Failed to mark student as absent. Please try again.');
+            console.error('Mark/unmark absent error:', error);
+            alert('Failed to update absent status. Please try again.');
 
-            // Re-enable button
+            // Re-enable button and restore original text
             absentBtn.disabled = false;
-            absentBtn.innerHTML = '<i class="bi bi-person-x"></i> Mark Student as Absent';
+            if (isAbsent) {
+                absentBtn.innerHTML = '<i class="bi bi-person-check"></i> Unmark as Absent';
+            } else {
+                absentBtn.innerHTML = '<i class="bi bi-person-x"></i> Mark Student as Absent';
+            }
         }
     }
 
