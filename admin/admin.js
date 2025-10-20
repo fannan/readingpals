@@ -28,6 +28,7 @@ class FeedbackAudit {
         // Stats elements
         this.totalPairsCount = document.getElementById('totalPairsCount');
         this.completedCount = document.getElementById('completedCount');
+        this.absentCount = document.getElementById('absentCount');
         this.missingCount = document.getElementById('missingCount');
         this.completionRate = document.getElementById('completionRate');
 
@@ -39,11 +40,15 @@ class FeedbackAudit {
         this.photoCount = document.getElementById('photoCount');
         this.submitPhotosBtn = document.getElementById('submitPhotosBtn');
         this.cancelUploadBtn = document.getElementById('cancelUploadBtn');
+        this.markAbsentBtn = document.getElementById('markAbsentBtn');
 
         // Current upload context
         this.currentUploadContext = null;
         this.uploadedPhotos = [];
         this.storage = null;
+
+        // API endpoint for marking absent
+        this.markAbsentApiUrl = 'https://tasks.sklabs.app/webhook/mark-absent';
     }
 
     bindEvents() {
@@ -54,6 +59,7 @@ class FeedbackAudit {
         this.photoInput.addEventListener('change', (e) => this.handlePhotoUpload(e));
         this.submitPhotosBtn.addEventListener('click', () => this.submitPhotos());
         this.cancelUploadBtn.addEventListener('click', () => this.closeUploadModal());
+        this.markAbsentBtn.addEventListener('click', () => this.markStudentAbsent());
     }
 
     initializeStorage() {
@@ -317,6 +323,7 @@ class FeedbackAudit {
 
         let totalPairs = 0;
         let completedPairs = 0;
+        let absentPairs = 0;
 
         // Build a section for each volunteer
         sortedVolunteers.forEach(volunteer => {
@@ -331,12 +338,15 @@ class FeedbackAudit {
 
             totalPairs += studentsToCount.length;
             completedPairs += studentsToCount.filter(student =>
-                this.hasFeedback(volunteer.id, student.id)
+                this.hasFeedback(volunteer.id, student.id) && !this.isAbsent(volunteer.id, student.id)
+            ).length;
+            absentPairs += studentsToCount.filter(student =>
+                this.isAbsent(volunteer.id, student.id)
             ).length;
         });
 
         // Update stats
-        this.updateStats(totalPairs, completedPairs);
+        this.updateStats(totalPairs, completedPairs, absentPairs);
 
         // Show the grid
         this.hideLoading();
@@ -379,8 +389,17 @@ class FeedbackAudit {
     createStudentItem(volunteer, student) {
         const item = document.createElement('div');
         const hasSubmitted = this.hasFeedback(volunteer.id, student.id);
+        const isAbsent = this.isAbsent(volunteer.id, student.id);
 
-        item.className = `student-item ${hasSubmitted ? 'completed' : 'missing'}`;
+        // Determine status class: absent takes precedence over completed
+        let statusClass = 'missing';
+        if (isAbsent) {
+            statusClass = 'absent';
+        } else if (hasSubmitted) {
+            statusClass = 'completed';
+        }
+
+        item.className = `student-item ${statusClass}`;
 
         // Student name
         const nameDiv = document.createElement('div');
@@ -392,7 +411,9 @@ class FeedbackAudit {
         const statusDiv = document.createElement('div');
         statusDiv.className = 'student-status';
 
-        if (hasSubmitted) {
+        if (isAbsent) {
+            statusDiv.innerHTML = '<i class="bi bi-person-x-fill"></i> Absent';
+        } else if (hasSubmitted) {
             statusDiv.innerHTML = '<i class="bi bi-check-circle-fill"></i> Submitted';
         } else {
             statusDiv.innerHTML = `
@@ -539,6 +560,59 @@ class FeedbackAudit {
         }
     }
 
+    async markStudentAbsent() {
+        if (!this.currentUploadContext) {
+            return;
+        }
+
+        const { volunteer, student, date } = this.currentUploadContext;
+
+        // Confirm with user
+        if (!confirm(`Mark ${student.name} as absent for ${date}?\n\nThis will update the record in Notion.`)) {
+            return;
+        }
+
+        // Disable button and show loading
+        this.markAbsentBtn.disabled = true;
+        this.markAbsentBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Marking as Absent...';
+
+        try {
+            // Call n8n webhook to mark student absent
+            const response = await fetch(this.markAbsentApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    volunteer_id: volunteer.id,
+                    volunteer_name: volunteer.name,
+                    student_id: student.id,
+                    student_name: student.name,
+                    date: date
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API returned ${response.status}`);
+            }
+
+            // Success!
+            alert(`${student.name} marked as absent for ${date}`);
+            this.closeUploadModal();
+
+            // Refresh the audit to update the status
+            await this.refreshAudit();
+
+        } catch (error) {
+            console.error('Mark absent error:', error);
+            alert('Failed to mark student as absent. Please try again.');
+
+            // Re-enable button
+            this.markAbsentBtn.disabled = false;
+            this.markAbsentBtn.innerHTML = '<i class="bi bi-person-x"></i> Mark Student as Absent';
+        }
+    }
+
     hasFeedback(volunteerId, studentId) {
         // Check if feedback exists for this volunteer-student pair
         // The API returns property_volunteer and property_student as arrays
@@ -551,12 +625,27 @@ class FeedbackAudit {
         });
     }
 
-    updateStats(totalPairs, completedPairs) {
-        const missingPairs = totalPairs - completedPairs;
+    isAbsent(volunteerId, studentId) {
+        // Check if student is marked absent for this volunteer-student pair
+        const feedback = this.feedbackData.find(feedback => {
+            const feedbackVolunteerId = feedback.property_volunteer?.[0];
+            const feedbackStudentId = feedback.property_student?.[0];
+
+            return feedbackVolunteerId === volunteerId &&
+                   feedbackStudentId === studentId;
+        });
+
+        // If feedback exists and has an "Absent" property set to true
+        return feedback?.property_absent === true || feedback?.property_absent === 'Yes';
+    }
+
+    updateStats(totalPairs, completedPairs, absentPairs) {
+        const missingPairs = totalPairs - completedPairs - absentPairs;
         const rate = totalPairs > 0 ? Math.round((completedPairs / totalPairs) * 100) : 0;
 
         this.totalPairsCount.textContent = totalPairs;
         this.completedCount.textContent = completedPairs;
+        this.absentCount.textContent = absentPairs;
         this.missingCount.textContent = missingPairs;
         this.completionRate.textContent = `${rate}%`;
     }
@@ -612,6 +701,7 @@ class FeedbackAudit {
 
         let totalPairs = 0;
         let completedPairs = 0;
+        let absentPairs = 0;
 
         // Build a section for each volunteer
         sortedVolunteers.forEach(volunteer => {
@@ -620,12 +710,15 @@ class FeedbackAudit {
 
             totalPairs += volunteer.students.length;
             completedPairs += volunteer.students.filter(student =>
-                this.hasFeedback(volunteer.id, student.id)
+                this.hasFeedback(volunteer.id, student.id) && !this.isAbsent(volunteer.id, student.id)
+            ).length;
+            absentPairs += volunteer.students.filter(student =>
+                this.isAbsent(volunteer.id, student.id)
             ).length;
         });
 
         // Update stats
-        this.updateStats(totalPairs, completedPairs);
+        this.updateStats(totalPairs, completedPairs, absentPairs);
 
         // Show the grid
         this.hideLoading();

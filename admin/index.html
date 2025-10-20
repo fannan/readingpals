@@ -89,7 +89,7 @@
 
         .stats-row {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(5, 1fr);
             gap: clamp(0.5rem, 1vw, 1rem);
             margin-bottom: clamp(0.75rem, 2vw, 1.5rem);
         }
@@ -124,6 +124,10 @@
 
         .stat-card.primary .stat-number {
             color: var(--primary-color);
+        }
+
+        .stat-card.warning .stat-number {
+            color: #FFA500;
         }
 
         .audit-grid {
@@ -219,6 +223,30 @@
 
         .student-item.missing .student-status {
             color: var(--danger-color);
+        }
+
+        .student-item.absent {
+            background: rgba(255, 165, 0, 0.1);
+            border: 2px solid #FFA500;
+            cursor: default;
+        }
+
+        .student-item.absent:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .student-item.absent .student-status {
+            color: #FFA500;
+        }
+
+        .student-item.completed {
+            cursor: default;
+        }
+
+        .student-item.completed:hover {
+            transform: none;
+            box-shadow: none;
         }
 
         .upload-btn {
@@ -417,6 +445,10 @@
                     <div class="stat-number" id="completedCount">0</div>
                     <div class="stat-label">Completed</div>
                 </div>
+                <div class="stat-card warning">
+                    <div class="stat-number" id="absentCount">0</div>
+                    <div class="stat-label">Absent</div>
+                </div>
                 <div class="stat-card danger">
                     <div class="stat-number" id="missingCount">0</div>
                     <div class="stat-label">Missing</div>
@@ -462,6 +494,14 @@
 
             <div class="photo-grid" id="photoGrid"></div>
             <div class="photo-count" id="photoCount"></div>
+
+            <div style="text-align: center; margin: 1.5rem 0; color: var(--text-light); font-size: 0.9rem;">
+                — or —
+            </div>
+
+            <button class="btn btn-warning w-100 mb-3" id="markAbsentBtn">
+                <i class="bi bi-person-x"></i> Mark Student as Absent
+            </button>
 
             <div class="upload-modal-actions">
                 <button class="btn btn-outline-secondary" id="cancelUploadBtn">Cancel</button>
