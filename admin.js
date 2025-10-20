@@ -46,7 +46,8 @@ class FeedbackAdmin {
                 this.availableDates = data.data.map(item => ({
                     date: item.name,
                     day: item.day_name,
-                    staff: item.staff || []
+                    staff: item.staff || [],
+                    schedule_id: item.schedule_id
                 }));
             } else {
                 this.availableDates = [];
@@ -185,18 +186,24 @@ class FeedbackAdmin {
         const selectedDateData = data.data.find(d => d.name === date);
         if (!selectedDateData || !selectedDateData.volunteers) return [];
 
-        const scheduledVolunteerIds = selectedDateData.volunteers.map(v => v.id);
+        // Create a map of volunteer IDs to their schedule IDs for this date
+        const volunteerScheduleMap = new Map();
+        selectedDateData.volunteers.forEach(v => {
+            volunteerScheduleMap.set(v.id, v.schedule_id);
+        });
 
         // Get full volunteer data with students for scheduled volunteers
         const scheduledPairs = [];
         data.volunteers.forEach(volunteer => {
-            if (scheduledVolunteerIds.includes(volunteer.id)) {
+            const scheduleId = volunteerScheduleMap.get(volunteer.id);
+            if (scheduleId) {
                 volunteer.students.forEach(student => {
                     scheduledPairs.push({
                         volunteerId: volunteer.id,
                         volunteerName: volunteer.name,
                         studentId: student.id,
-                        studentName: student.name
+                        studentName: student.name,
+                        scheduleId: scheduleId
                     });
                 });
             }
@@ -335,7 +342,7 @@ class FeedbackAdmin {
         // Only make pending cards clickable
         const onClickHandler = pair.hasFeedback
             ? ''
-            : `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}')"`
+            : `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}')"`
 
         const cursorStyle = pair.hasFeedback ? 'cursor: default;' : '';
 
@@ -397,12 +404,13 @@ class FeedbackAdmin {
         return text.replace(/[&<>"']/g, m => map[m]);
     }
 
-    openUploadModal(volunteerId, studentId, volunteerName, studentName) {
+    openUploadModal(volunteerId, studentId, volunteerName, studentName, scheduleId) {
         this.uploadModalData = {
             volunteerId,
             studentId,
             volunteerName,
-            studentName
+            studentName,
+            scheduleId
         };
 
         // Show modal
@@ -544,7 +552,7 @@ class FeedbackAdmin {
             return;
         }
 
-        const { volunteerId, studentId, volunteerName, studentName } = this.uploadModalData;
+        const { volunteerId, studentId, volunteerName, studentName, scheduleId } = this.uploadModalData;
 
         // Confirm with user
         if (!confirm(`Mark ${studentName} as absent for ${this.selectedDate}?\n\nThis will update the record in Notion.`)) {
@@ -568,7 +576,8 @@ class FeedbackAdmin {
                     volunteer_name: volunteerName,
                     student_id: studentId,
                     student_name: studentName,
-                    date: this.selectedDate
+                    date: this.selectedDate,
+                    schedule_id: scheduleId
                 })
             });
 
