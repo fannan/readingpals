@@ -539,6 +539,60 @@ class FeedbackAdmin {
         }
     }
 
+    async markStudentAbsent() {
+        if (!this.uploadModalData) {
+            return;
+        }
+
+        const { volunteerId, studentId, volunteerName, studentName } = this.uploadModalData;
+
+        // Confirm with user
+        if (!confirm(`Mark ${studentName} as absent for ${this.selectedDate}?\n\nThis will update the record in Notion.`)) {
+            return;
+        }
+
+        // Disable button and show loading
+        const absentBtn = document.getElementById('markAbsentBtn');
+        absentBtn.disabled = true;
+        absentBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Marking as Absent...';
+
+        try {
+            // Call n8n webhook to mark student absent
+            const response = await fetch('https://tasks.sklabs.app/webhook/mark-absent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    volunteer_id: volunteerId,
+                    volunteer_name: volunteerName,
+                    student_id: studentId,
+                    student_name: studentName,
+                    date: this.selectedDate
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API returned ${response.status}`);
+            }
+
+            // Success!
+            alert(`${studentName} marked as absent for ${this.selectedDate}`);
+            this.closeUploadModal();
+
+            // Reload the data
+            await this.loadFeedback();
+
+        } catch (error) {
+            console.error('Mark absent error:', error);
+            alert('Failed to mark student as absent. Please try again.');
+
+            // Re-enable button
+            absentBtn.disabled = false;
+            absentBtn.innerHTML = '<i class="bi bi-person-x"></i> Mark Student as Absent';
+        }
+    }
+
     renderMedia(record) {
         if (!record.urls || record.urls.length === 0) return '';
 
