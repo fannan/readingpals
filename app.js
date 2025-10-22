@@ -134,12 +134,12 @@ class FeedbackRecorder {
             // Show advanced fields (Reading Level and Word Accuracy Rate)
             this.readingLevelContainer.style.display = 'block';
             this.accuracyContainer.style.display = 'block';
-            this.advancedToggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i> Hide Advanced Fields';
+            this.advancedToggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i> Hide Advanced';
         } else {
             // Hide advanced fields (keep Book Difficulty visible)
             this.readingLevelContainer.style.display = 'none';
             this.accuracyContainer.style.display = 'none';
-            this.advancedToggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i> Show Advanced Fields';
+            this.advancedToggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i> Show Advanced';
         }
     }
 

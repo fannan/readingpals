@@ -484,9 +484,15 @@ class FeedbackAdmin {
         document.getElementById('readingLevelValue').textContent = 'A';
         document.getElementById('uploadSubmitBtn').disabled = true;
 
+        // Reset book difficulty selection
+        this.selectedDifficulty = null;
+        document.querySelectorAll('.difficulty-pill').forEach(btn => {
+            btn.classList.remove('active');
+        });
+
         // Hide metrics section by default
         document.getElementById('metricsSection').style.display = 'none';
-        document.getElementById('toggleMetricsBtn').innerHTML = '<i class="bi bi-sliders"></i> Add Accuracy & Reading Level (Optional)';
+        document.getElementById('toggleMetricsBtn').innerHTML = '<i class="bi bi-sliders"></i> Add Metrics (Optional)';
 
         // Update absent button text based on current state
         const absentBtn = document.getElementById('markAbsentBtn');
@@ -499,16 +505,35 @@ class FeedbackAdmin {
         }
     }
 
+    selectDifficulty(difficulty) {
+        this.selectedDifficulty = difficulty;
+
+        // Update UI - remove active from all, add to selected
+        document.querySelectorAll('.difficulty-pill').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        document.querySelector(`.difficulty-pill[data-difficulty="${difficulty}"]`).classList.add('active');
+    }
+
+    updateAccuracySlider(value) {
+        document.getElementById('accuracyValue').textContent = `${value}%`;
+    }
+
+    updateReadingLevelSlider(value) {
+        const letter = String.fromCharCode(65 + parseInt(value));
+        document.getElementById('readingLevelValue').textContent = letter;
+    }
+
     toggleMetrics() {
         const metricsSection = document.getElementById('metricsSection');
         const toggleBtn = document.getElementById('toggleMetricsBtn');
 
         if (metricsSection.style.display === 'none') {
             metricsSection.style.display = 'block';
-            toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Hide Accuracy & Reading Level';
+            toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Hide Metrics';
         } else {
             metricsSection.style.display = 'none';
-            toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Add Accuracy & Reading Level (Optional)';
+            toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Add Metrics (Optional)';
         }
     }
 
@@ -537,17 +562,6 @@ class FeedbackAdmin {
         this.updateUploadButtonState();
     }
 
-    updateAccuracySlider(value) {
-        document.getElementById('accuracyValue').textContent = `${value}%`;
-        this.updateUploadButtonState();
-    }
-
-    updateReadingLevelSlider(value) {
-        const letter = String.fromCharCode(65 + parseInt(value));
-        document.getElementById('readingLevelValue').textContent = letter;
-        this.updateUploadButtonState();
-    }
-
     updateUploadButtonState() {
         const hasPhotos = this.uploadedPhotos && this.uploadedPhotos.length > 0;
         document.getElementById('uploadSubmitBtn').disabled = !hasPhotos;
@@ -564,6 +578,7 @@ class FeedbackAdmin {
         const accuracy = metricsVisible ? parseInt(document.getElementById('accuracySlider').value) : 0;
         const readingLevelIndex = metricsVisible ? parseInt(document.getElementById('readingLevelSlider').value) : 0;
         const readingLevel = String.fromCharCode(65 + readingLevelIndex);
+        const bookDifficulty = metricsVisible ? this.selectedDifficulty : null;
 
         // Show loading
         const submitBtn = document.getElementById('uploadSubmitBtn');
@@ -598,7 +613,8 @@ class FeedbackAdmin {
                 this.uploadModalData.volunteerId,
                 staff,
                 accuracy,
-                readingLevel
+                readingLevel,
+                bookDifficulty
             );
 
             alert('Feedback uploaded successfully!');
