@@ -355,7 +355,7 @@ class SimpleSupabaseUpload {
         }
     }
 
-    async uploadPhotoFiles(photoBlobs, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right') {
+    async uploadPhotoFiles(photoBlobs, volunteerName, sessionDate = null, volunteerDisplayName = null, student = null, volunteerId = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right', comment = null) {
         try {
             console.log('Uploading', photoBlobs.length, 'photos to Supabase...');
 
@@ -423,7 +423,8 @@ class SimpleSupabaseUpload {
                     staff,
                     accuracyRate,
                     readingLevel,
-                    bookDifficulty
+                    bookDifficulty,
+                    comment
                 );
                 console.log('Webhook sent successfully:', webhookResult);
             } catch (webhookError) {
@@ -499,7 +500,7 @@ class SimpleSupabaseUpload {
         });
     }
 
-    async sendPhotosToWebhook(volunteerId, volunteerName, photoUrls, transcription, totalFileSize = 0, sessionDate = null, student = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right') {
+    async sendPhotosToWebhook(volunteerId, volunteerName, photoUrls, transcription, totalFileSize = 0, sessionDate = null, student = null, staff = [], accuracyRate = 0, readingLevel = 'A', bookDifficulty = 'just-right', comment = null) {
         try {
             console.log('Sending photo data to webhook...');
 
@@ -528,6 +529,7 @@ class SimpleSupabaseUpload {
                 word_accuracy_rate: accuracyRate,
                 reading_level: readingLevel,
                 book_difficulty: bookDifficulty,
+                comment: comment,  // Include comment if provided
                 date: submissionDate
             };
 

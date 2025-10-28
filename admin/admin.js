@@ -492,7 +492,12 @@ class FeedbackAdmin {
 
         // Hide metrics section by default
         document.getElementById('metricsSection').style.display = 'none';
-        document.getElementById('toggleMetricsBtn').innerHTML = '<i class="bi bi-sliders"></i> Add Metrics (Optional)';
+        document.getElementById('toggleMetricsBtn').innerHTML = '<i class="bi bi-sliders"></i> Add Metrics';
+
+        // Hide comment section by default
+        document.getElementById('commentSection').style.display = 'none';
+        document.getElementById('toggleCommentBtn').innerHTML = '<i class="bi bi-chat-left-text"></i> Add Comment';
+        document.getElementById('commentTextarea').value = '';
 
         // Update absent button text based on current state
         const absentBtn = document.getElementById('markAbsentBtn');
@@ -533,7 +538,20 @@ class FeedbackAdmin {
             toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Hide Metrics';
         } else {
             metricsSection.style.display = 'none';
-            toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Add Metrics (Optional)';
+            toggleBtn.innerHTML = '<i class="bi bi-sliders"></i> Add Metrics';
+        }
+    }
+
+    toggleComment() {
+        const commentSection = document.getElementById('commentSection');
+        const toggleBtn = document.getElementById('toggleCommentBtn');
+
+        if (commentSection.style.display === 'none') {
+            commentSection.style.display = 'block';
+            toggleBtn.innerHTML = '<i class="bi bi-chat-left-text"></i> Hide Comment';
+        } else {
+            commentSection.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="bi bi-chat-left-text"></i> Add Comment';
         }
     }
 
@@ -580,6 +598,10 @@ class FeedbackAdmin {
         const readingLevel = String.fromCharCode(65 + readingLevelIndex);
         const bookDifficulty = metricsVisible ? this.selectedDifficulty : null;
 
+        // Get comment if visible
+        const commentVisible = document.getElementById('commentSection').style.display !== 'none';
+        const comment = commentVisible ? document.getElementById('commentTextarea').value.trim() : null;
+
         // Show loading
         const submitBtn = document.getElementById('uploadSubmitBtn');
         submitBtn.disabled = true;
@@ -614,7 +636,8 @@ class FeedbackAdmin {
                 staff,
                 accuracy,
                 readingLevel,
-                bookDifficulty
+                bookDifficulty,
+                comment
             );
 
             alert('Feedback uploaded successfully!');
