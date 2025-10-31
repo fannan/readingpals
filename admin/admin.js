@@ -375,27 +375,39 @@ class FeedbackAdmin {
     }
 
     createGridItem(pair) {
-        // Determine card class and status based on state
-        let cardClass, statusText, onClickHandler, cursorStyle;
+        // Determine card class, header text, and action buttons based on state
+        let cardClass, headerText, actionButtons;
 
         if (pair.hasFeedback) {
-            // Has feedback - not clickable
+            // Has feedback - show "Saved", no action buttons
             cardClass = 'has-feedback';
-            statusText = '✓ Done';
-            onClickHandler = '';
-            cursorStyle = 'cursor: default;';
+            headerText = 'Saved';
+            actionButtons = '';
         } else if (pair.isAbsent) {
-            // Absent - still clickable to unmark
+            // Absent - show "Absent" header and "Mark Available" button
             cardClass = 'is-absent';
-            statusText = 'Absent';
-            onClickHandler = `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}', ${pair.isAbsent})"`;
-            cursorStyle = '';
+            headerText = 'Absent';
+            actionButtons = `
+                <div class="card-actions">
+                    <button class="card-btn btn-mark-available" onclick="event.stopPropagation(); adminApp.markAbsentFromCard('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}', ${pair.isAbsent})">
+                        Mark Available
+                    </button>
+                </div>
+            `;
         } else {
-            // Pending - clickable
+            // Pending - show "Waiting" header with Save and Mark Absent buttons
             cardClass = 'no-feedback';
-            statusText = 'Pending';
-            onClickHandler = `onclick="adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}', ${pair.isAbsent})"`;
-            cursorStyle = '';
+            headerText = 'Waiting';
+            actionButtons = `
+                <div class="card-actions">
+                    <button class="card-btn btn-save" onclick="event.stopPropagation(); adminApp.openUploadModal('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}', ${pair.isAbsent})">
+                        Save
+                    </button>
+                    <button class="card-btn btn-mark-absent" onclick="event.stopPropagation(); adminApp.markAbsentFromCard('${pair.volunteerId}', '${pair.studentId}', '${this.escapeHtml(pair.volunteerName)}', '${this.escapeHtml(pair.studentName)}', '${pair.scheduleId}', ${pair.isAbsent})">
+                        Mark Absent
+                    </button>
+                </div>
+            `;
         }
 
         // Show feedback count if multiple submissions
@@ -404,13 +416,16 @@ class FeedbackAdmin {
             : '';
 
         return `
-            <div class="file-item ${cardClass}" ${onClickHandler} style="${cursorStyle}">
+            <div class="file-item ${cardClass}">
                 ${countBadge}
-                <div>
-                    <div class="volunteer-name">${pair.volunteerName}</div>
-                    <div class="student-name">${pair.studentName}</div>
+                <div class="card-header">${headerText}</div>
+                <div class="card-body">
+                    <div>
+                        <div class="volunteer-name">${pair.volunteerName}</div>
+                        <div class="student-name">${pair.studentName}</div>
+                    </div>
+                    ${actionButtons}
                 </div>
-                <div class="status-badge">${statusText}</div>
             </div>
         `;
     }
@@ -498,16 +513,6 @@ class FeedbackAdmin {
         document.getElementById('commentSection').style.display = 'none';
         document.getElementById('toggleCommentBtn').innerHTML = '<i class="bi bi-chat-left-text"></i> Add Comment';
         document.getElementById('commentTextarea').value = '';
-
-        // Update absent button text based on current state
-        const absentBtn = document.getElementById('markAbsentBtn');
-        if (isAbsent) {
-            absentBtn.innerHTML = '<i class="bi bi-person-check"></i> Unmark as Absent';
-            absentBtn.className = 'btn btn-info w-100 mb-3';
-        } else {
-            absentBtn.innerHTML = '<i class="bi bi-person-x"></i> Mark Student as Absent';
-            absentBtn.className = 'btn btn-warning w-100 mb-3';
-        }
     }
 
     selectDifficulty(difficulty) {
@@ -651,6 +656,73 @@ class FeedbackAdmin {
             alert('Failed to upload feedback: ' + error.message);
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="bi bi-upload me-2"></i>Submit Feedback';
+        }
+    }
+
+    async markAbsentFromCard(volunteerId, studentId, volunteerName, studentName, scheduleId, isAbsent) {
+        // Confirm with user
+        const confirmMessage = isAbsent
+            ? `Unmark ${studentName} as absent for ${this.selectedDate}?\n\nThis will update the record in Notion.`
+            : `Mark ${studentName} as absent for ${this.selectedDate}?\n\nThis will update the record in Notion.`;
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // Create optimistic update key
+        const optimisticKey = `${volunteerId}-${studentId}-${this.selectedDate}`;
+
+        try {
+            // Optimistically update the UI immediately
+            this.optimisticAbsentChanges.set(optimisticKey, !isAbsent);
+
+            // Refresh the grid with optimistic state
+            this.gridData = this.createGridData(this.scheduledPairs, this.feedbackRecords, this.absentList);
+            this.updateStats();
+            this.renderGrid();
+
+            // Call n8n webhook to mark/unmark student absent
+            const response = await fetch('https://tasks.sklabs.app/webhook/mark-absent', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    volunteer_id: volunteerId,
+                    volunteer_name: volunteerName,
+                    student_id: studentId,
+                    student_name: studentName,
+                    date: this.selectedDate,
+                    schedule_id: scheduleId,
+                    unmark: isAbsent  // Add flag to indicate if we're unmarking
+                })
+            });
+
+            if (!response.ok) {
+                // Revert optimistic update on error
+                this.optimisticAbsentChanges.delete(optimisticKey);
+                this.gridData = this.createGridData(this.scheduledPairs, this.feedbackRecords, this.absentList);
+                this.updateStats();
+                this.renderGrid();
+                throw new Error(`API returned ${response.status}`);
+            }
+
+            // Success!
+            const successMessage = isAbsent
+                ? `${studentName} unmarked as absent for ${this.selectedDate}`
+                : `${studentName} marked as absent for ${this.selectedDate}`;
+
+            // Show brief success message (optional)
+            console.log(successMessage);
+
+            // Schedule cleanup of optimistic update after 30 seconds
+            setTimeout(() => {
+                this.optimisticAbsentChanges.delete(optimisticKey);
+            }, 30000);
+
+        } catch (error) {
+            console.error('Mark/unmark absent error:', error);
+            alert('Failed to update absent status. Please try again.');
         }
     }
 

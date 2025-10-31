@@ -127,36 +127,112 @@
             border-radius: 8px;
             border: none;
             transition: all 0.3s ease;
+            padding: 0;
+            min-height: 180px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .file-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        }
+
+        .file-item .card-header {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-align: center;
+            color: white;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .file-item.has-feedback .card-header {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .file-item.no-feedback .card-header {
+            background: linear-gradient(135deg, #dc3545, #e83e4e);
+        }
+
+        .file-item.is-absent .card-header {
+            background: linear-gradient(135deg, #ffc107, #ffb300);
+            color: #333;
+        }
+
+        .file-item .card-body {
             padding: 1rem;
-            min-height: 140px;
+            flex: 1;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
+        }
+
+        .file-item.has-feedback .card-body {
+            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8f4 100%);
+        }
+
+        .file-item.no-feedback .card-body {
+            background: linear-gradient(135deg, #ffebee 0%, #fce4ec 100%);
+        }
+
+        .file-item.is-absent .card-body {
+            background: linear-gradient(135deg, #fff8e1 0%, #fffbf0 100%);
+        }
+
+        .file-item .card-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .file-item .card-btn {
+            padding: 0.5rem 0.75rem;
+            font-size: 0.75rem;
+            border-radius: 6px;
+            font-weight: 600;
+            border: none;
+            transition: all 0.2s ease;
             cursor: pointer;
-            position: relative;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
         }
 
-        .file-item.no-feedback:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        .file-item .btn-save {
+            background: var(--primary-color);
+            color: white;
         }
 
-        .file-item.is-absent:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+        .file-item .btn-save:hover {
+            background: #084A6F;
+            transform: translateY(-1px);
         }
 
-        .file-item.has-feedback {
-            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+        .file-item .btn-mark-absent {
+            background: #ffc107;
+            color: #333;
         }
 
-        .file-item.no-feedback {
-            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+        .file-item .btn-mark-absent:hover {
+            background: #e0a800;
+            transform: translateY(-1px);
         }
 
-        .file-item.is-absent {
-            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+        .file-item .btn-mark-available {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .file-item .btn-mark-available:hover {
+            background: #138496;
+            transform: translateY(-1px);
         }
 
         .file-item .volunteer-name {
@@ -172,30 +248,6 @@
             color: var(--text-light);
             margin-bottom: 0.5rem;
             line-height: 1.2;
-        }
-
-        .file-item .status-badge {
-            display: inline-block;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            text-align: center;
-        }
-
-        .file-item.has-feedback .status-badge {
-            background: #28a745;
-            color: white;
-        }
-
-        .file-item.no-feedback .status-badge {
-            background: #dc3545;
-            color: white;
-        }
-
-        .file-item.is-absent .status-badge {
-            background: #ffc107;
-            color: #333;
         }
 
         /* Book Difficulty Pills */
@@ -321,28 +373,22 @@
             box-shadow: 0 2px 6px rgba(10, 95, 140, 0.3);
         }
 
-        .file-item .upload-btn {
-            margin-top: 0.5rem;
-            padding: 0.4rem 0.6rem;
-            font-size: 0.75rem;
-            border-radius: 6px;
-        }
-
         .file-item .feedback-count {
             position: absolute;
-            top: 0.5rem;
+            top: 0.35rem;
             right: 0.5rem;
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.95);
             color: var(--text-dark);
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 700;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+            z-index: 10;
         }
 
         .badge {
@@ -584,10 +630,6 @@
                                     <textarea class="form-control" id="commentTextarea" rows="4" placeholder="Add any additional notes or feedback..." style="border: 2px solid var(--border-color); border-radius: 8px; resize: vertical;"></textarea>
                                 </div>
                             </div>
-
-                            <button class="btn btn-warning w-100 mb-3" id="markAbsentBtn" onclick="adminApp.markStudentAbsent()">
-                                <i class="bi bi-person-x"></i> Mark Student as Absent
-                            </button>
 
                             <div class="d-flex gap-2">
                                 <button class="btn btn-outline-primary flex-fill" onclick="adminApp.closeUploadModal()">
