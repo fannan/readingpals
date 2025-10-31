@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reading Pals - Feedback Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        .header-icon {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin: 0 auto 20px;
+        }
+        .table-responsive {
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .table {
+            margin-bottom: 0;
+        }
+        .table thead th {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            font-weight: 600;
+            padding: 20px 15px;
+        }
+        .table tbody tr {
+            transition: all 0.3s ease;
+        }
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: scale(1.01);
+        }
+        .table tbody td {
+            padding: 20px 15px;
+            vertical-align: middle;
+            border-color: #e9ecef;
+        }
+        .volunteer-name {
+            font-weight: 600;
+            color: #495057;
+        }
+        .file-date {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        .file-size {
+            background: #e9ecef;
+            padding: 4px 8px;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            color: #495057;
+        }
+        .audio-control {
+            width: 200px;
+        }
+        .btn-download {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            border: none;
+            border-radius: 10px;
+            padding: 8px 16px;
+            color: white;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        .btn-download:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+            color: white;
+        }
+        .stats-row {
+            background: linear-gradient(45deg, #28a745, #20c997);
+            color: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-5">
+        <div class="row justify-content-center">
+            <div class="col-11">
+                <div class="card main-card p-4 p-md-5">
+                    <div class="text-center mb-4">
+                        <div class="header-icon">
+                            <i class="bi bi-folder-open"></i>
+                        </div>
+                        <h1 class="h2 mb-1 text-primary">Feedback Admin</h1>
+                        <p class="text-muted mb-0">View and manage volunteer feedback recordings</p>
+                    </div>
+
+                    <div class="row stats-row text-center">
+                        <div class="col-md-4">
+                            <h3 class="mb-1" id="totalFiles">-</h3>
+                            <small>Total Recordings</small>
+                        </div>
+                        <div class="col-md-4">
+                            <h3 class="mb-1" id="uniqueVolunteers">-</h3>
+                            <small>Active Volunteers</small>
+                        </div>
+                        <div class="col-md-4">
+                            <h3 class="mb-1" id="lastUpdated">-</h3>
+                            <small>Last Updated</small>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h4 class="mb-0">All Feedback Files</h4>
+                        <button class="btn btn-primary" id="refreshBtn">
+                            <i class="bi bi-arrow-clockwise me-2"></i>Refresh
+                        </button>
+                    </div>
+
+                    <!-- Loading Section -->
+                    <div id="loadingSection" class="text-center py-5">
+                        <div class="loading-spinner mb-3">
+                            <i class="bi bi-arrow-clockwise fs-2 text-primary"></i>
+                        </div>
+                        <p class="text-muted">Loading feedback files from Supabase...</p>
+                    </div>
+
+                    <!-- Error Section -->
+                    <div id="errorSection" class="alert alert-danger" style="display: none;">
+                        <h6><i class="bi bi-exclamation-triangle me-2"></i>Error Loading Files</h6>
+                        <p class="mb-0" id="errorMessage">Unable to load feedback files. Please check your connection and try again.</p>
+                    </div>
+
+                    <!-- Files Section -->
+                    <div id="filesSection" style="display: none;">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="searchInput" placeholder="Search by volunteer name or date...">
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Volunteer</th>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Size</th>
+                                        <th>Audio</th>
+                                        <th>Download</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="filesTableBody">
+                                    <!-- Files will be populated here -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div id="noFiles" class="text-center py-5" style="display: none;">
+                            <i class="bi bi-inbox fs-1 text-muted mb-3"></i>
+                            <h5 class="text-muted">No feedback files found</h5>
+                            <p class="text-muted">Recordings will appear here once volunteers submit feedback.</p>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="index.html" class="btn btn-outline-primary">
+                            <i class="bi bi-arrow-left me-2"></i>Back to Feedback Form
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-storage.js"></script>
+    <script>
+        class SupabaseAdmin {
+            constructor() {
+                this.storage = new SupabaseStorage();
+                this.files = [];
+                this.filteredFiles = [];
+
+                this.initializeElements();
+                this.bindEvents();
+                this.loadFiles();
+            }
+
+            initializeElements() {
+                this.loadingSection = document.getElementById('loadingSection');
+                this.filesSection = document.getElementById('filesSection');
+                this.errorSection = document.getElementById('errorSection');
+                this.filesTableBody = document.getElementById('filesTableBody');
+                this.noFiles = document.getElementById('noFiles');
+                this.refreshBtn = document.getElementById('refreshBtn');
+                this.searchInput = document.getElementById('searchInput');
+                this.totalFiles = document.getElementById('totalFiles');
+                this.uniqueVolunteers = document.getElementById('uniqueVolunteers');
+                this.lastUpdated = document.getElementById('lastUpdated');
+                this.errorMessage = document.getElementById('errorMessage');
+            }
+
+            bindEvents() {
+                this.refreshBtn.addEventListener('click', () => this.refreshFiles());
+                this.searchInput.addEventListener('input', (e) => this.filterFiles(e.target.value));
+            }
+
+            async loadFiles() {
+                try {
+                    this.showLoading();
+                    await this.storage.initialize();
+                    this.files = await this.storage.listFiles();
+                    this.filteredFiles = [...this.files];
+                    this.updateStats();
+                    this.renderFiles();
+                    this.showFiles();
+                } catch (error) {
+                    console.error('Error loading files:', error);
+                    this.showError(error.message);
+                }
+            }
+
+            updateStats() {
+                this.totalFiles.textContent = this.files.length;
+
+                const uniqueVolunteersSet = new Set(this.files.map(f => f.volunteerName));
+                this.uniqueVolunteers.textContent = uniqueVolunteersSet.size;
+
+                this.lastUpdated.textContent = new Date().toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            renderFiles() {
+                if (this.filteredFiles.length === 0) {
+                    this.filesTableBody.innerHTML = '';
+                    this.noFiles.style.display = 'block';
+                    return;
+                }
+
+                this.noFiles.style.display = 'none';
+
+                const rows = this.filteredFiles.map(file => this.createFileRow(file)).join('');
+                this.filesTableBody.innerHTML = rows;
+            }
+
+            createFileRow(file) {
+                return `
+                    <tr>
+                        <td>
+                            <div class="volunteer-name">${file.volunteerName}</div>
+                        </td>
+                        <td>
+                            <div class="file-date">${file.displayDate}</div>
+                        </td>
+                        <td>
+                            <div class="file-date">${this.formatUploadTime(file.uploadDate)}</div>
+                        </td>
+                        <td>
+                            <span class="file-size">${this.formatFileSize(file.size)}</span>
+                        </td>
+                        <td>
+                            <audio controls class="audio-control">
+                                <source src="${file.url}" type="audio/webm">
+                                <source src="${file.url}" type="audio/mpeg">
+                                Your browser does not support audio.
+                            </audio>
+                        </td>
+                        <td>
+                            <a href="${file.url}" download="${file.fileName}" class="btn-download">
+                                <i class="bi bi-download me-1"></i>Download
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }
+
+            formatUploadTime(uploadDate) {
+                const date = new Date(uploadDate);
+                return date.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+            filterFiles(searchTerm) {
+                if (!searchTerm.trim()) {
+                    this.filteredFiles = [...this.files];
+                } else {
+                    const term = searchTerm.toLowerCase();
+                    this.filteredFiles = this.files.filter(file =>
+                        file.volunteerName.toLowerCase().includes(term) ||
+                        file.displayDate.toLowerCase().includes(term) ||
+                        file.date.includes(term)
+                    );
+                }
+                this.renderFiles();
+            }
+
+            async refreshFiles() {
+                this.refreshBtn.disabled = true;
+                this.refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise loading-spinner me-2"></i>Refreshing...';
+
+                try {
+                    await this.loadFiles();
+                } finally {
+                    this.refreshBtn.disabled = false;
+                    this.refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise me-2"></i>Refresh';
+                }
+            }
+
+            showLoading() {
+                this.loadingSection.style.display = 'block';
+                this.filesSection.style.display = 'none';
+                this.errorSection.style.display = 'none';
+            }
+
+            showFiles() {
+                this.loadingSection.style.display = 'none';
+                this.filesSection.style.display = 'block';
+                this.errorSection.style.display = 'none';
+            }
+
+            showError(message) {
+                this.loadingSection.style.display = 'none';
+                this.filesSection.style.display = 'none';
+                this.errorSection.style.display = 'block';
+                this.errorMessage.textContent = message;
+            }
+        }
+
+        // Initialize the admin when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            new SupabaseAdmin();
+        });
+    </script>
+</body>
+</html>

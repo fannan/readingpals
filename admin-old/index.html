@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reading Pals - Feedback Audit</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0A5F8C;
+            --accent-color: #FF6B4A;
+            --success-color: #28A745;
+            --danger-color: #DC3545;
+            --text-dark: #2C3E50;
+            --text-light: #6C757D;
+            --bg-light: #F8F9FA;
+            --border-color: #E0E0E0;
+        }
+
+        body {
+            background: var(--bg-light);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            color: var(--text-dark);
+            padding: clamp(0.5rem, 2vw, 1rem) clamp(0.5rem, 2vw, 1rem);
+        }
+
+        .admin-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .admin-header {
+            background: var(--primary-color);
+            color: white;
+            padding: clamp(0.75rem, 2vw, 1.5rem);
+            border-radius: 8px;
+            margin-bottom: clamp(0.75rem, 2vw, 1.5rem);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .admin-header h1 {
+            margin: 0;
+            font-size: clamp(1.1rem, 3vw, 1.5rem);
+            font-weight: 600;
+        }
+
+        .admin-header p {
+            display: none;
+        }
+
+        .controls-card {
+            background: white;
+            border-radius: 8px;
+            padding: clamp(0.75rem, 2vw, 1.5rem);
+            margin-bottom: clamp(0.75rem, 2vw, 1.5rem);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--text-dark);
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-select {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            transition: all 0.2s ease;
+        }
+
+        .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(10, 95, 140, 0.1);
+            outline: none;
+        }
+
+        .audit-card {
+            background: white;
+            border-radius: 8px;
+            padding: clamp(0.75rem, 2vw, 1.5rem);
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: clamp(0.5rem, 1vw, 1rem);
+            margin-bottom: clamp(0.75rem, 2vw, 1.5rem);
+        }
+
+        .stat-card {
+            background: var(--bg-light);
+            border-radius: 8px;
+            padding: clamp(0.75rem, 2vw, 1.25rem);
+            text-align: center;
+        }
+
+        .stat-card .stat-number {
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-card .stat-label {
+            color: var(--text-light);
+            font-size: clamp(0.65rem, 1.8vw, 0.8rem);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .stat-card.success .stat-number {
+            color: var(--success-color);
+        }
+
+        .stat-card.danger .stat-number {
+            color: var(--danger-color);
+        }
+
+        .stat-card.primary .stat-number {
+            color: var(--primary-color);
+        }
+
+        .stat-card.warning .stat-number {
+            color: #FFA500;
+        }
+
+        .audit-grid {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .volunteer-section {
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .volunteer-header {
+            background: var(--primary-color);
+            color: white;
+            padding: clamp(0.65rem, 2vw, 1rem) clamp(0.75rem, 2vw, 1.5rem);
+            font-weight: 600;
+            font-size: clamp(0.95rem, 2.5vw, 1.05rem);
+        }
+
+        .student-list {
+            padding: clamp(0.25rem, 1vw, 0.5rem);
+        }
+
+        .student-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: clamp(0.65rem, 2vw, 1rem) clamp(0.75rem, 2vw, 1.25rem);
+            border-radius: 8px;
+            margin-bottom: clamp(0.35rem, 1vw, 0.5rem);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .student-item:hover {
+            transform: translateX(4px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .student-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .student-item.completed {
+            background: rgba(40, 167, 69, 0.1);
+            border: 2px solid var(--success-color);
+        }
+
+        .student-item.missing {
+            background: rgba(220, 53, 69, 0.1);
+            border: 2px solid var(--danger-color);
+        }
+
+        .student-item.loading {
+            background: var(--bg-light);
+            border: 2px solid var(--border-color);
+        }
+
+        .student-name {
+            font-weight: 500;
+            font-size: clamp(0.9rem, 2vw, 1rem);
+        }
+
+        .student-status {
+            display: flex;
+            align-items: center;
+            gap: clamp(0.35rem, 1vw, 0.5rem);
+            font-weight: 600;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+        }
+
+        .student-status i {
+            font-size: clamp(1rem, 2.5vw, 1.2rem);
+        }
+
+        .student-status {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .student-status .status-text {
+            display: flex;
+            align-items: center;
+            gap: clamp(0.35rem, 1vw, 0.5rem);
+        }
+
+        .student-item.completed .student-status {
+            color: var(--success-color);
+        }
+
+        .student-item.missing .student-status {
+            color: var(--danger-color);
+        }
+
+        .student-item.absent {
+            background: rgba(255, 165, 0, 0.1);
+            border: 2px solid #FFA500;
+            cursor: default;
+        }
+
+        .student-item.absent:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .student-item.absent .student-status {
+            color: #FFA500;
+        }
+
+        .student-item.completed {
+            cursor: default;
+        }
+
+        .student-item.completed:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .upload-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.4rem 0.65rem;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .upload-btn:hover {
+            background: #084A6F;
+            transform: scale(1.05);
+        }
+
+        .upload-btn i {
+            font-size: 1rem;
+        }
+
+        /* Upload Modal */
+        .upload-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .upload-modal.show {
+            display: flex;
+        }
+
+        .upload-modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            max-width: 90%;
+            width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .upload-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .upload-modal-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-dark);
+        }
+
+        .photo-upload-label {
+            display: block;
+            width: 100%;
+            padding: 1rem;
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-light);
+            color: var(--primary-color);
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 1rem;
+        }
+
+        .photo-upload-label:hover {
+            border-color: var(--primary-color);
+            background: #E8F4F8;
+        }
+
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .photo-item {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid var(--border-color);
+        }
+
+        .photo-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .photo-item .remove-btn {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            background: rgba(220, 53, 69, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .photo-count {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+
+        .upload-modal-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .upload-modal-actions .btn {
+            flex: 1;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-light);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            color: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container admin-container">
+        <div class="admin-header">
+            <h1><i class="bi bi-clipboard-check"></i> Feedback Audit</h1>
+            <p>Track which volunteers have submitted feedback for each session</p>
+        </div>
+
+        <div class="controls-card">
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="dateSelect" class="form-label">Select Session Date</label>
+                    <select class="form-select" id="dateSelect">
+                        <option value="">Loading dates...</option>
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" id="refreshBtn">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="statsSection" style="display: none;">
+            <div class="stats-row">
+                <div class="stat-card primary">
+                    <div class="stat-number" id="totalPairsCount">0</div>
+                    <div class="stat-label">Total Expected</div>
+                </div>
+                <div class="stat-card success">
+                    <div class="stat-number" id="completedCount">0</div>
+                    <div class="stat-label">Completed</div>
+                </div>
+                <div class="stat-card warning">
+                    <div class="stat-number" id="absentCount">0</div>
+                    <div class="stat-label">Absent</div>
+                </div>
+                <div class="stat-card danger">
+                    <div class="stat-number" id="missingCount">0</div>
+                    <div class="stat-label">Missing</div>
+                </div>
+                <div class="stat-card primary">
+                    <div class="stat-number" id="completionRate">0%</div>
+                    <div class="stat-label">Completion Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="audit-card">
+            <div id="loadingSection" class="loading-spinner" style="display: none;">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3">Checking feedback status...</p>
+            </div>
+
+            <div id="emptyState" class="empty-state">
+                <i class="bi bi-calendar-event"></i>
+                <h3>Select a Date</h3>
+                <p>Choose a session date above to view the feedback audit</p>
+            </div>
+
+            <div id="auditGrid" class="audit-grid" style="display: none;">
+                <!-- Volunteer sections will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="upload-modal" id="uploadModal">
+        <div class="upload-modal-content">
+            <div class="upload-modal-header">
+                <h3 id="uploadModalTitle">Upload Photos</h3>
+            </div>
+
+            <input type="file" id="photoInput" accept="image/*" multiple style="display: none;">
+            <label for="photoInput" class="photo-upload-label">
+                <i class="bi bi-images"></i> Add Photos
+            </label>
+
+            <div class="photo-grid" id="photoGrid"></div>
+            <div class="photo-count" id="photoCount"></div>
+
+            <div style="text-align: center; margin: 1.5rem 0; color: var(--text-light); font-size: 0.9rem;">
+                — or —
+            </div>
+
+            <button class="btn btn-warning w-100 mb-3" id="markAbsentBtn">
+                <i class="bi bi-person-x"></i> Mark Student as Absent
+            </button>
+
+            <div class="upload-modal-actions">
+                <button class="btn btn-outline-secondary" id="cancelUploadBtn">Cancel</button>
+                <button class="btn btn-primary" id="submitPhotosBtn" style="display: none;">
+                    <i class="bi bi-cloud-upload"></i> Submit Photos
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="../simple-supabase.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
